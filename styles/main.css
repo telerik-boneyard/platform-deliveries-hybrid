@@ -1,0 +1,107 @@
+#kendo-ui-mobile-app .image-with-text img {
+    float: left;
+    margin-right: 15px;
+}
+
+#kendo-ui-mobile-app .button-block,
+#kendo-ui-mobile-app .block {
+    display: block;
+    margin: 1em;
+    padding: 0.5em;
+    text-align: center;
+}
+
+#kendo-ui-mobile-app .footer {
+    display: block;
+    padding: 0.5em;
+    text-align: center;
+    color: #BBBBBB;
+}
+
+#kendo-ui-mobile-app .button-submit {
+    background-color: #10c4b2;
+    color: white;
+}
+
+#kendo-ui-mobile-app .button-group {
+    width: 100%;
+    display: table;
+    border-collapse: separate;
+    border-spacing: 1em;
+}
+
+#kendo-ui-mobile-app .button-block {
+    display: block;
+}
+
+#kendo-ui-mobile-app .group-separator {
+    border: none;
+    background: transparent;
+}
+
+#kendo-ui-mobile-app .group-separator-header {
+    margin: 1em 0;
+}
+
+#kendo-ui-mobile-app .app-icon {
+    text-align: center;
+    margin: 3em 0;
+}
+
+#kendo-ui-mobile-app .km-drawer-button:after,
+#kendo-ui-mobile-app .km-drawer-button:before {
+    content: '\e077';
+}
+
+.km-home:after,
+.km-home:before {
+    content: "\e\E0AF";
+}
+
+.km-dataListView:after,
+.km-dataListView:before {
+    content: "\e\E0AF";
+}
+
+.km-current:after,
+.km-current:before {
+    content: "\e0bb";
+    color: blue;
+}
+
+.km-pending:after,
+.km-pending:before {
+    content: "\e08d";
+    color: orange;
+}
+
+.km-delivered:after,
+.km-delivered:before {
+    content: "\e030";
+    color: green;
+}
+
+.km-problem:after,
+.km-problem:before {
+    content: "\e031";
+    color: red;
+}
+
+.hidden {
+    display: none;
+}
+.item-label {
+    display: block;
+}
+
+.item-value {
+    display: block;
+    font-weight: bold;
+}
+
+.bottom_aligner {
+    display: inline-block;
+    height: 100%;
+    vertical-align: bottom;
+    width: 0px;
+}

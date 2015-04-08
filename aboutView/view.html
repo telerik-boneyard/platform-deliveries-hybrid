@@ -1,0 +1,35 @@
+<div data-role="view" data-title="Help & About" data-layout="main">
+    <header data-role="header">
+        <div data-role="navbar" class="header-text">
+            <a data-role="backbutton" data-align="left">Back</a>
+            <span style="overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: center; display: block; margin-left: 70px; margin-right: 70px;">Help & About</span>
+        </div>
+    </header>
+    <div class="signin-view">
+        <p>This is a sample app demonstrating the offline support in Telerik Backend Services JavaScript SDK.</p>
+        <h3>What it does</h3>
+        <p>This app is about making deliveries. There are two user roles - a manager and a delivery guy. The manager sees all delivery orders and can enter new ones. The delivery guy can see all delivery orders assigned to him and change their status. Both the manager and the delivery guy can comment on the delivery orders.</p>
+        <h3>Initializing data</h3>
+        <p>For your convenience this app can initialize your application with the required content types and sample data. Just click on the "Initialize Data" button from the initial screen.</p>
+        <h3>Testing offline storage</h3>
+        <p>For easier testing you can switch between offline and online with a click of a button. In your real apps, you will usually switch based on the actual connectivity of the device.</p>
+        <h3>What to test</h3>
+        <p>Here are some example scenarios you can test.</p>
+        <h4>Offline update</h4>
+        <p>
+            <ol>
+                <li>Log in as a delivery guy.</li>
+                <li>Make sure you are working online and the device has Internet connection.</li>
+                <li>Go to "My Orders" to see the delivery orders assigned to you.</li>
+                <li>Switch to offline mode.</li>
+                <li>Pick a delivery order and set its status to "Delivered".</li>
+                <li>From the Backend Services portal and check the status of that order.</li>
+                <li>Result: the status is not "Delivered" as the information has not been synchronized with the server.</li>
+                <li>In the app, switch to online mode. This will trigger the synchronization.</li>
+                <li>From the Backend Services Portal and check the status of the order.</li>
+                <li>Result: the status is now "Delivered".</li>
+            </ol>
+        </p>
+
+    </div>
+</div>

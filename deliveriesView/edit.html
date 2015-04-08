@@ -1,0 +1,16 @@
+<div data-role="view" data-layout="main" data-model="app.models.deliveriesView.deliveriesViewList.viewModel" data-bind="events: { show: onEditViewShow }">
+    <header data-role="header">
+        <div data-role="navbar" class="header-text">
+            <a data-role="backbutton" data-align="left">Back</a>
+            <span style="overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: center; display: block; margin-left: 70px; margin-right: 70px;" data-bind="text: currentItem.DeliveryItem"></span>
+            <a data-role="button" data-align="right" data-bind="events: { click: onSaveClick }">Save</a>
+        </div>
+    </header>
+    <div>
+        <span class="item-label">Comments</span>
+        <textarea id="comment-textarea" style="resize: none" data-bind="value: currentItem.Comments"></textarea>
+        
+        <span class="item-label">Status</span>
+        <select data-role="dropdownlist" data-text-field="name" data-value-field="value" data-value-primitive="true" data-bind="source: statuses, value: currentItem.Status"></select>
+    </div>
+</div>

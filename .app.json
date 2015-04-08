@@ -1,0 +1,78 @@
+{
+  "type": "kendo-ui-mobile",
+  "name": "Kendo UI Mobile App",
+  "navigation": "tabstrip",
+  "views": [
+    {
+      "type": "view",
+      "name": "home",
+      "title": "Home",
+      "addToNavigation": true,
+      "icon": "\\E0AF",
+      "components": []
+    },
+    {
+      "type": "view",
+      "name": "signInView1",
+      "title": "Sign In",
+      "addToNavigation": false,
+      "components": [
+        {
+          "type": "signin",
+          "name": "signInView1SignInViewSignInViewSignin",
+          "navigateToSignup": true,
+          "signup": "registerView",
+          "signinRedirect": "home",
+          "dataProvider": "defaultProvider"
+        }
+      ]
+    },
+    {
+      "type": "view",
+      "name": "registerView",
+      "title": "Registration",
+      "addToNavigation": false,
+      "components": [
+        {
+          "type": "signup",
+          "name": "registerViewSignup",
+          "navigateToSignin": true,
+          "signin": "signInView1",
+          "dataProvider": "defaultProvider"
+        }
+      ]
+    },
+    {
+      "type": "view",
+      "name": "dataListView",
+      "title": "DataList",
+      "addToNavigation": true,
+      "icon": "\\E0AF",
+      "components": [
+        {
+          "type": "list",
+          "name": "dataListViewList",
+          "dataProvider": "defaultProvider",
+          "collection": "Activities",
+          "masterDetails": true,
+          "iconField": true,
+          "headerField": "Text",
+          "pullToRefresh": true,
+          "endlessScroll": false
+        }
+      ]
+    }
+  ],
+  "view": "signInView1",
+  "skin": "flat",
+  "transition": "slide",
+  "dataProviders": [
+    {
+      "type": "dataProvider",
+      "name": "defaultProvider",
+      "title": "DefaultProvider",
+      "source": "everlive",
+      "everliveKey": "ITEWqf6rUV83bKUd"
+    }
+  ]
+}

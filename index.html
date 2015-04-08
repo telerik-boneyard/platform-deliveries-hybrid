@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title></title>
+    <meta charset="utf-8">
+    <link href="bower_components/kendo-ui-appbuilder-core/styles/kendo.mobile.all.min.css" rel="stylesheet">
+    <link href="styles/main.css" rel="stylesheet">
+
+    <!-- cordova script (this will be a 404 during development if served with `grunt serve`) -->
+    <script src="cordova.js"></script>
+
+    <script src="bower_components/kendo-ui-appbuilder-core/js/jquery.min.js"></script>
+    <script src="bower_components/kendo-ui-appbuilder-core/js/kendo.mobile.min.js"></script>
+    <script src="bower_components/everlive/src/everlive.all.js"></script>
+    <script src="constants.js"></script>
+    <script src="app.js"></script>
+    <script src="data/defaultProvider.js"></script>
+</head>
+
+<body id="kendo-ui-mobile-app">
+    <div data-role="layout" data-id="main">
+        <header data-role="header">
+            <div data-role="navbar">
+                <span data-role="view-title"></span>
+            </div>
+        </header>
+
+        <!-- application views will be rendered here -->
+
+        <footer data-role="footer">
+            <div align="center" class="footer hidden" onclick="app.refreshConnectivity()">
+                <div id="status-online">
+                    You are working <strong>ONLINE</strong>
+                </div>
+                <div id="status-offline">
+                    You are working <strong>OFFLINE</strong>
+                </div>
+            </div>
+        </footer>
+    </div>
+    <script src="loading/index.js"></script>
+    <script src="home/index.js"></script>
+    <script src="signInView/index.js"></script>
+    <script src="registerView/index.js"></script>
+    <script src="deliveriesView/index.js"></script>
+</body>
+
+</html>
