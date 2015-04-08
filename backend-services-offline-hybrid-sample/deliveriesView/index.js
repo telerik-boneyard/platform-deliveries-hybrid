@@ -15,7 +15,7 @@ app.models.deliveriesView = (function() {
                 $('#title-deliveries').text('Pending Orders');
                 $('#div-no-deliveries').text('No pending orders found.');
             } else if (filter === 'completed') {
-                filteredStatus = Constants.OrderStatus.Delivered;
+                filteredStatus = [Constants.OrderStatus.Delivered];
                 $('#title-deliveries').text('Delivered Orders');
                 $('#div-no-deliveries').text('No delivered orders found.');
             } else if (filter === 'failed') {
@@ -27,15 +27,18 @@ app.models.deliveriesView = (function() {
                 $('#div-no-deliveries').text('No orders found.');
             }
             
+            var currentFilter = null;
+            
             //Set filter for the Kendo DataSource
-            if (filteredStatus) {
-                if (filteredStatus.length) filteredStatus = { $in: filteredStatus };
-                app.models.deliveriesView.deliveriesViewList.viewModel.currentFilter = { Status: filteredStatus };
-            } else {
-                app.models.deliveriesView.deliveriesViewList.viewModel.currentFilter = null;
+            if (filteredStatus && filteredStatus.length !== 0) {
+                currentFilter = {logic: 'or', filters: []};
+                for(var i = 0; i < filteredStatus.length; i++){
+                	currentFilter.filters.push({field: 'Status', operator: 'eq', value: filteredStatus[i]});
+                }
             }
             
-            //Force the DataSource to reload items
+            app.models.deliveriesView.deliveriesViewList.viewModel.dataSource.filter(currentFilter);    
+            
             app.models.deliveriesView.deliveriesViewList.viewModel.dataSource.read();
         },
         onHide: function() {
@@ -62,6 +65,7 @@ app.models.deliveriesView.deliveriesViewList = (function() {
     //Initialize the Kendo DataSource
     var source = new kendo.data.DataSource({
         type: 'everlive',
+        serverFiltering: true,
         transport: {
             typeName: 'DeliveryOrder',
             dataProvider: dataProvider,
