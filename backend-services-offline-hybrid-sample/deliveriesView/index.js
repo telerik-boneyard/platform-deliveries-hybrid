@@ -1,7 +1,5 @@
 'use strict';
 
-
-
 app.models.deliveriesView = (function() {
     return {
         onShow: function(e) {
@@ -152,11 +150,7 @@ app.models.deliveriesView.deliveriesViewList = (function() {
         dataSource: source,
         currentFilter: null,
         currentItem: null,
-        statuses: [
-            { name: "Pending", value: Constants.OrderStatus.Pending},
-            { name: "Current", value: Constants.OrderStatus.Current},
-            { name: "Delivered", value: Constants.OrderStatus.Delivered}
-        ],
+        statuses: Constants.OrderStatusNames,
 
         itemClick: function(e) {
             app.mobileApp.navigate('deliveriesView/details.html?uid=' + e.dataItem.uid);

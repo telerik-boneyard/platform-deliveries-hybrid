@@ -23,3 +23,11 @@ Constants.OrderStatus = {
     Refused: 4,
     Problem: 10
 };
+
+Constants.OrderStatusNames = [
+    { name: "Pending", value: Constants.OrderStatus.Pending},
+    { name: "Current", value: Constants.OrderStatus.Current},
+    { name: "Delivered", value: Constants.OrderStatus.Delivered},
+    { name: "Refused", value: Constants.OrderStatus.Refused},
+    { name: "Problem", value: Constants.OrderStatus.Problem}
+];
