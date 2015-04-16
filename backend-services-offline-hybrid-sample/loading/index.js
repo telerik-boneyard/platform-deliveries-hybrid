@@ -1,5 +1,5 @@
 'use strict';
-
+var everliveBaseUrl = 'http://api.everlive.com/v1/';
 app.models.loading = (function() {
     var dataProvider = app.data.defaultprovider;
     
@@ -39,7 +39,86 @@ app.models.loading = (function() {
     };
     
     var _initializeData = function() {
+        _createContentTypes()
+        .then(_createUsers)
+        //.then(_createData)
+        .then(function() {
+            alert('success');
+        })
+        .catch(function() {
+            alert('error');
+        });
         
+    };
+    
+    var _createContentTypes = function() {
+        var types = sampleData.ContentTypes;
+        
+        var type = types['DeliveryOrder'];
+        return _createContentType('DeliveryOrder', type);
+    };
+    
+    var _createContentType = function(typeName, typeDefinition) {
+        var fields = typeDefinition.Fields;
+        delete typeDefinition.Fields;
+        
+        var url = everliveBaseUrl + 'Metadata/Applications/' + Constants.System.ApiKey + '/Types';
+        return _ajaxRequestPromise(url, typeDefinition)
+            .then(
+                function() {
+                    return _createContentTypeFields(typeName, fields);
+                }
+            );
+    };
+    
+    var _createContentTypeFields = function(typeName, fields) {
+        var url = everliveBaseUrl + 'Metadata/Applications/' + Constants.System.ApiKey + '/Types/' + typeName + '/Fields';
+        return _ajaxRequestPromise(url, fields);
+    };
+    
+    var _createData = function() {
+        var data = sampleData.Data.DeliveryOrder;
+        var url = everliveBaseUrl + Constants.System.ApiKey + '/DeliveryOrder';
+        return _ajaxRequestPromise(url, data);
+    };
+    
+    var _createUsers = function() {
+        var users = sampleData.Users;
+        var url = everliveBaseUrl + Constants.System.ApiKey + '/Users';
+        return _ajaxRequestPromise(url, users);
+    };
+    
+    var _get = function(url, success, error) {
+        $.ajax({
+            method: "GET",
+            url: url,
+            headers: {
+                'Authorization': 'masterkey ' + Constants.System.MasterKey
+            },
+            success: success,
+            error: error
+        });    
+    };
+    
+    var _ajaxRequestPromise = function(url, data) {
+        var promise = new RSVP.Promise(function(resolve, reject) {
+            $.ajax({
+                method: "POST",
+                url: url,
+                headers: {
+                    'Authorization': 'masterkey ' + Constants.System.MasterKey,
+                    'Content-Type': 'application/json'
+                },
+                data: JSON.stringify(data),
+                success: function() {
+                    resolve();
+                },
+                error: function() {
+                    resolve();
+                }
+            });
+        });
+        return promise;
     };
     
     return {

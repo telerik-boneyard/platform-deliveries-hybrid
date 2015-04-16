@@ -7,7 +7,7 @@ app.models.home = (function() {
             dataProvider.Users.currentUser(
                 function(data) {
                     app.models.home.homeView.viewModel.set("userName", data.result.DisplayName);
-                    app.models.home.homeView.viewModel.set("userRole", data.result.Role === Constants.Role.Manager ? 'Manager' : 'Delivery Guy');
+                    //app.models.home.homeView.viewModel.set("userRole", data.result.Role === Constants.Role.Manager ? 'Manager' : 'Delivery Guy');
                 },
                 function(error) {
                     alert(JSON.stringify(error));

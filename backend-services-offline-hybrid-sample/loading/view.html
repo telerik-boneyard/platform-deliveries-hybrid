@@ -1,16 +1,22 @@
 <div data-role="view" data-layout="main" data-model="app.models.loading" data-show="app.models.loading.onShow">
     <div id="div-loading" align="center">
-        loading...
+        <p>loading...</p>
     </div>
     <div id="error-no-api-key" align="center" class="hidden">
-        Before using this sample you must enter your API key in the constants.js file in the root folder of the project.
+        <h1>API Key Required</h1>
+        <p>Before using this sample you must enter your API key in the constants.js file in the root folder of the project.</p>
+        <p>You can find your API key in the "API Keys" section in the Telerik Backend Services Web Portal.</p>
     </div>
     <div id="error-no-master-key" align="center" class="hidden">
-        The server-side data for this sample has not been initialized. In order to initialize it you need to set your master key in the constants.js file in the root folder of the project.
+        <h1>Master Key Required</h1>
+        <p>The server-side data for this sample app has not been initialized. We can initialize it automatically, but we need your master key. Please enter it in the constants.js file in the root folder of the project.</p>
+        <p>You can find your master key in the "API Keys" section in the Telerik Backend Services Web Portal. Once you have provided your master key, just build and run this app again.</p>
+        <p><br /><br /><strong>WARNING</strong><br /> You should never include your master key in the code of your app. Someone could reverse-engineer it and get full access to your server-side data.</p>
     </div>
     <div id="initialize-data" align="center" class="hidden">
-        The server-side data for this sample has not been initialized. Tap on the button below to initialize it. Note, that this will create several content types in the project associated with your master key. It will also create several users and insert some data.
-        
+        <h1>Initialize Data</h1>
+        <p>The server-side data for this sample app has not been initialized. Tap on the button below to initialize it.</p>
+        <p>Note, that this will create several content types in the project associated with your master key. It will also create several users and insert some data in the newly created content types.</p>
         <div class="button-group" align="center">
             <a data-role="button" class="button button-block" data-bind="events: { click: initializeData }">Initialize Data</a>
         </div>
