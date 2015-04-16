@@ -79,10 +79,6 @@ app.models.deliveriesView.deliveriesViewList = (function() {
 
         schema: {
             model: {
-                //Returns a friendly title for the item
-                title: function() {
-                    return this.get('DeliveryItem') + ' (' + this.get('DeliveryItemType') + ')';
-                },
                 cityAndPostcode: function() {
                     return this.get('DeliveryAddressCity') + ', ' + this.get('DeliveryAddressPostcode');
                 },

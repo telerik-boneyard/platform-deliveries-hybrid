@@ -1,31 +1,45 @@
 <div data-role="view" data-title="Details" data-layout="main" data-model="app.models.deliveriesView.deliveriesViewList.viewModel" data-bind="events: { show: onDetailsViewShow }">
     <header data-role="header">
         <div data-role="navbar" class="header-text">
-            <a data-role="backbutton" data-align="left">Back</a>
-            <span style="overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: center; display: block; margin-left: 70px; margin-right: 70px;" data-bind="text: currentItem.DeliveryItem"></span>
-            <a data-role="button" data-align="right" data-bind="events: { click: editItem }">Edit</a>
+            <a data-role="backbutton" data-align="left" data-icon="details">Back</a>
+            <span style="overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: center; display: block; margin-left: 60px; margin-right: 60px;" data-bind="text: currentItem.DeliveryItem"></span>
+            <a data-role="button" data-align="right" data-icon="compose" data-bind="events: { click: editItem }">Edit</a>
         </div>
     </header>
-    <div>
-        <span class="item-label">Item</span>
-        <span class="item-value" data-bind="text: currentItem.DeliveryItem"></span>
+    <div class="delivery-details">
+        <div class="item">
+            <small class="item-label">Item</small>
+            <span class="item-value" data-bind="text: currentItem.DeliveryItem"></span>
+        </div>
         
-        <span class="item-label">Type</span>
-        <span class="item-value" data-bind="text: currentItem.DeliveryItemType"></span>
+        <div class="item">
+            <small class="item-label">Type</small>
+            <span class="item-value" data-bind="text: currentItem.DeliveryItemType"></span>
+        </div>
         
-        <span class="item-label">Status</span>
-        <span class="item-value" data-bind="text: currentItem.status"></span>
-        <span data-bind="attr: { class: currentItem.icon }"></span>
+        <div class="item">
+            <small class="item-label">Status</small>
+            <span class="item-value">
+                <span data-bind="attr: { class: currentItem.icon }"></span>
+                <span data-bind="text: currentItem.status"></span>
+            </span>
+        </div>
         
-        <span class="item-label">Deliver to</span>
-        <span class="item-value" data-bind="text: currentItem.DeliveryName"></span>
+        <div class="item">
+            <small class="item-label">Deliver to</small>
+            <span class="item-value" data-bind="text: currentItem.DeliveryName"></span>
+        </div>
         
-        <span class="item-label">Address</span>
-        <span class="item-value" data-bind="text: currentItem.cityAndPostcode"></span>
-        <span class="item-value" data-bind="text: currentItem.DeliveryAddressLine1"></span>
-        <span class="item-value" data-bind="text: currentItem.DeliveryAddressLine2"></span>
+        <div class="item">
+            <small class="item-label">Address</small>
+            <span class="item-value" data-bind="text: currentItem.cityAndPostcode"></span>
+            <span class="item-value" data-bind="text: currentItem.DeliveryAddressLine1"></span>
+            <span class="item-value" data-bind="text: currentItem.DeliveryAddressLine2"></span>
+        </div>
         
-        <span class="item-label">Comments</span>
-        <span class="item-value" data-bind="text: currentItem.Comments"></span>
+        <div class="item" data-bind="visible: currentItem.Comments">
+            <small class="item-label">Comments</small>
+            <span class="item-value" data-bind="text: currentItem.Comments"></span>
+        </div>
     </div>
 </div>

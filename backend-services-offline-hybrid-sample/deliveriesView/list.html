@@ -1,29 +1,27 @@
 <div data-role="view" data-title="DataList" data-layout="main" data-model="app.models.deliveriesView" data-show="app.models.deliveriesView.onShow" data-hide="app.models.deliveriesView.onHide">
     <header data-role="header">
         <div data-role="navbar" class="header-text">
-            <a data-role="backbutton" data-align="left">Back</a>
-            <span id="title-deliveries" style="overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: center; display: block; margin-left: 70px; margin-right: 70px;">My Deliveries</span>
+            <a data-role="backbutton" data-align="left" data-icon="details">Back</a>
+            <span id="title-deliveries" style="overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: center; display: block; margin-left: 60px; margin-right: 60px;">My Deliveries</span>
         </div>
     </header>
-    <ul id="div-list-deliveries" class="hidden" data-role="listview" data-style="inset" data-template="dataListViewListTemplate" data-auto-bind="false" data-bind="{ source: deliveriesViewList.viewModel.dataSource, events: {click: deliveriesViewList.viewModel.itemClick} }" data-pull-to-refresh="true" data-endless-scroll="false">
+    <ul id="div-list-deliveries" class="list-deliveries hidden" data-role="listview" data-template="dataListViewListTemplate" data-auto-bind="false" data-bind="{ source: deliveriesViewList.viewModel.dataSource, events: {click: deliveriesViewList.viewModel.itemClick} }" data-pull-to-refresh="true" data-endless-scroll="false">
 
     </ul>
-    <div id="div-loading-deliveries" class="hidden">
+    <div id="div-loading-deliveries" class="loading hidden">
         loading...
     </div>
-    <div id="div-no-deliveries">
+    <div id="div-no-deliveries" class="no-data">
         No delivery orders found.
     </div>
     <script type="text/x-kendo-template" id="dataListViewListTemplate">
-        <div style="display: table;">
-            <div style="display: table-cell; vertical-align: middle; padding: 0.2em;"><span class="#: data.icon() #"></span></div>
-            <div style="display: table-cell; width: 100%; float: right;">
-                
-                <span style="display: block; font-size: 1em; font-weight: bold;">#: data.title() #</span>
-                <span style="display: block; font-size: 0.8em">#: data.DeliveryAddressLine1 #</span>
-                <span style="display: block; font-size: 0.8em">#: data.cityAndPostcode() #</span>
-
-            </div>
+        <div class="icon">
+            <span class="#: data.icon() #"></span>
+        </div>
+        <div class="content">
+            <span class="title">#: data.DeliveryItem # <small>(#: data.DeliveryItemType #)</small></span>
+            <small class="address">#: data.DeliveryAddressLine1 #</small>
+            <small class="postcode">#: data.cityAndPostcode() #</small>
         </div>
     </script>
 </div>

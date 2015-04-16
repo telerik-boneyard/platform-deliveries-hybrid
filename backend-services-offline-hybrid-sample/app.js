@@ -8,10 +8,14 @@
     };
 
     var bootstrap = function() {
+        var os = kendo.support.mobileOS,
+            statusBarStyle = os.ios && os.flatVersion >= 700 ? 'black-translucent' : 'black';
+        
         $(function() {
             app.mobileApp = new kendo.mobile.Application(document.body, {
                 transition: 'slide',
                 skin: 'flat',
+                statusBarStyle: statusBarStyle,
                 // This is the initial view of the app. Note, that this will usually be the signin view. We have a special "loading"
                 // view only because this is a sample app and we need to check some things before we actually run the app (API key present, etc.)
                 initial: 'loading/view.html'
