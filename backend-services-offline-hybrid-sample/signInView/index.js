@@ -19,11 +19,16 @@ app.models.signInView = (function() {
                         app.currentUser = currentUser;
                         app.mobileApp.navigate('home/view.html');
                     } else {
-                        _showSection('div-login');
+                        if (isOnline) {
+                            //Show login form
+                            _showSection('div-login');
+                        } else {
+                            //Show error
+                            _showSection('error-offline-mode-initialize');
+                        }
                     }
                 },
                 function(error) {
-                    alert(JSON.stringify(error));
                     if (isOnline) {
                         //Show login form
                         _showSection('div-login');
@@ -49,33 +54,29 @@ app.models.signInView.signInView = (function() {
         alert(JSON.stringify(error));
     };
     
+    var _signin = function(username, password) {
+        var provider = app.data.defaultprovider;
+        provider.Users.login(
+            username,
+            password,
+            _onLoginSuccess,
+            _onLoginError
+        );
+    };
+    
     var viewModel = kendo.observable({
-        signin: function() {
-            var provider = app.data.defaultprovider;
-
-            // Authenticate user
-            provider.Users.login(
-                viewModel.model.username,
-                viewModel.model.password,
-                _onLoginSuccess,
-                _onLoginError
-            );
-        },
         about: function() {
             app.mobileApp.navigate('aboutView/view.html');
         },
         signInAndy: function() {
-            var provider = app.data.defaultprovider;
             var username = 'andy';
             var password = '111111';
-            
-            
-            provider.Users.login(
-                username,
-                password,
-                _onLoginSuccess,
-                _onLoginError
-            );
+            _signin(username, password);
+        },
+        signInMichael: function() {
+            var username = 'michael';
+            var password = '111111';
+            _signin(username, password);
         }
     });
     return viewModel;

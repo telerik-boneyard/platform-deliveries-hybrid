@@ -62,13 +62,12 @@
         }
     };
     
-    $(window).on({
-        offline : function() {
-            onConnectivityChanged(false);
-        },
-        online  : function() {
-            onConnectivityChanged(true);
-        }
+    document.addEventListener("online", function() {
+        onConnectivityChanged(true);
     });
+    
+    document.addEventListener("offline", function() {
+        onConnectivityChanged(false);
+    }); 
     
 }());
