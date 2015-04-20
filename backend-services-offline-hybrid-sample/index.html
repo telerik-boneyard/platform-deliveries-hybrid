@@ -15,7 +15,7 @@
 
     <script src="bower_components/kendo-ui-appbuilder-core/js/jquery.min.js"></script>
     <script src="bower_components/kendo-ui-appbuilder-core/js/kendo.mobile.min.js"></script>
-    <script src="bower_components/everlive/src/everlive.all.js"></script>
+    <script src="bower_components/everlive/src/everlive.js"></script>
     <script src="constants.js"></script>
     <script src="app.js"></script>
     <script src="data/defaultProvider.js"></script>
@@ -33,12 +33,18 @@
         <!-- application views will be rendered here -->
 
         <footer data-role="footer">
-            <div align="center" class="footer hidden" onclick="app.refreshConnectivity()">
-                <div id="status-online">
+            <div align="center" class="footer hidden">
+                <div id="status-online" class="status-online">
                     You are working <strong>ONLINE</strong>
                 </div>
-                <div id="status-offline">
+                <div id="status-offline" class="status-offline">
                     You are working <strong>OFFLINE</strong>
+                </div>
+                <div id="status-synchronizing" class="status-offline">
+                    Synchronizing data...
+                </div>
+                <div id="status-synchronizing-done" class="status-offline">
+                    Synchronization completed.
                 </div>
             </div>
         </footer>

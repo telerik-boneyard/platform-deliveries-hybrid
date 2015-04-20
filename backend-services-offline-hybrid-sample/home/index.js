@@ -3,6 +3,7 @@
 app.models.home = (function() {
     return {
         onShow: function() {
+            app.canSync = true;
             var dataProvider = app.data.defaultprovider;
             dataProvider.Users.currentUser(
                 function(data) {

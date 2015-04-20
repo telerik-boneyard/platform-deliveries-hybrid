@@ -4,7 +4,7 @@ app.models.signInView = (function() {
     var dataProvider = app.data.defaultprovider;
     
     var _showSection = function(sectionId) {
-        $('#div-loading').hide();
+        $('#div-loading-signin').hide();
         $('#' + sectionId).show();
     };
     

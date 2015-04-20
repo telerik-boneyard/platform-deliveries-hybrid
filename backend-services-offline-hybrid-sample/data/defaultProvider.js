@@ -6,11 +6,26 @@
     app.data.defaultprovider = new Everlive({
         apiKey: Constants.System.ApiKey,
         scheme: 'https',
-        offlineStorage: true,
-        persistTokens: true,
-        onAuthenticationRequired: function() {
-            app.navigate('signinView/view.html');
+        
+        offlineStorage: {
+            provider: {
+                type: Everlive.Constants.StorageProviders.LocalStorage
+            },
+            syncStart: function() {
+                app.showFooterSection('synchronizing');
+            },
+            syncEnd: function() {
+                app.showFooterSection('synchronizing-done');
+            }
+        },
+        
+        authentication: {
+            persist: true,
+            onAuthenticationRequired: function() {
+                app.navigate('signinView/view.html');
+            }
         }
+        
     });
-
+    
 }());
