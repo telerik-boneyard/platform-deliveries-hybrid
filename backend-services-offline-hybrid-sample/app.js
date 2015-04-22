@@ -29,7 +29,9 @@
         document.addEventListener(
             'deviceready',
             function() {
-                if (navigator && navigator.splashscreen) navigator.splashscreen.hide();
+                if (navigator && navigator.splashscreen) {
+                    navigator.splashscreen.hide();   
+                }
                 bootstrap();
             },
             false
@@ -44,10 +46,6 @@
     
     app.isOnline = function() {
         return navigator.connection.type !== 'none';
-    };
-    
-    app.refreshConnectivity = function() {
-        onConnectivityChanged(app.isOnline());
     };
     
     app.showFooterSection = function(sectionId) {
@@ -70,13 +68,15 @@
         if (isOnline) {
             app.showFooterSection('status-online');
             dataProvider.offline(false);
-            if (app.canSync) dataProvider.sync();
+            if (app.canSync) {
+                 dataProvider.sync();   
+            }
         } else {
             app.showFooterSection('status-offline');
             dataProvider.offline(true);
         }
     };
-    
+                    
     document.addEventListener("online", function() {
         onConnectivityChanged(true);
     });
@@ -84,5 +84,4 @@
     document.addEventListener("offline", function() {
         onConnectivityChanged(false);
     }); 
-    
 }());
