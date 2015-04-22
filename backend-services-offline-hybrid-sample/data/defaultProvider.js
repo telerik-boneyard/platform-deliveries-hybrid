@@ -11,11 +11,18 @@
             provider: {
                 type: Everlive.Constants.StorageProviders.LocalStorage
             },
-            syncStart: function() {
-                app.showFooterSection('synchronizing');
+            syncStart: function(done) {
+                app.showFooterSection('status-synchronizing');
+                done();
             },
-            syncEnd: function() {
-                app.showFooterSection('synchronizing-done');
+            syncEnd: function(err) {
+                if (err) {
+                    alert(JSON.stringify(err));
+                }
+                app.showFooterSection('status-synchronizing-done');
+                setTimeout(function() {
+                    app.showFooterSection('status-online');
+                }, 2000);
             }
         },
         
@@ -25,7 +32,6 @@
                 app.navigate('signinView/view.html');
             }
         }
-        
     });
     
 }());
