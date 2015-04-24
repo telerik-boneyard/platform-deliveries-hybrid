@@ -6,26 +6,7 @@
     app.data.defaultprovider = new Everlive({
         apiKey: Constants.System.ApiKey,
         scheme: 'https',
-        
-        offlineStorage: {
-            provider: {
-                type: Everlive.Constants.StorageProviders.LocalStorage
-            },
-            syncStart: function(done) {
-                app.showFooterSection('status-synchronizing');
-                done();
-            },
-            syncEnd: function(err) {
-                if (err) {
-                    alert(JSON.stringify(err));
-                }
-                app.showFooterSection('status-synchronizing-done');
-                setTimeout(function() {
-                    app.showFooterSection('status-online');
-                }, 2000);
-            }
-        },
-        
+        offlineStorage: true,
         authentication: {
             persist: true,
             onAuthenticationRequired: function() {
@@ -34,4 +15,17 @@
         }
     });
     
+    app.data.defaultprovider.on('syncStart', function() {
+        app.showFooterSection('status-synchronizing');
+    });
+    
+    app.data.defaultprovider.on('syncEnd', function(err) {
+        if (err) {
+            alert(JSON.stringify(err));
+        }
+        app.showFooterSection('status-synchronizing-done');
+        setTimeout(function() {
+            app.showFooterSection('status-online');
+        }, 2000);
+    });
 }());
