@@ -16,9 +16,19 @@
     <div id="initialize-data" class="hidden">
         <h1>Initialize Data</h1>
         <p>The server-side data for this sample app has not been initialized. Tap on the button below to initialize it.</p>
-        <p>Note, that this will create several content types in the project associated with your master key. It will also create several users and insert some data in the newly created content types.</p>
+        <p>Note, that this will create one content type in the project associated with your master key. It will also create several users and insert some data in the newly created content type.</p>
         <div class="button-group" align="center">
-            <a data-role="button" class="button button-block" data-bind="events: { click: initializeData }">Initialize Data</a>
+            <a id="button-initialize-data" data-role="button" class="button button-block" data-bind="events: { click: initializeData }">Initialize Data</a>
+        </div>
+    </div>
+    <div id="initializing-data" class="hidden">
+        <p align="center">Initializing server data. Please wiat...</p>
+    </div>
+    <div id="initialize-data-completed" class="hidden">
+        <h1>Initialization Completed</h1>
+        <p>The server-side data has been initialized successfully. Tap on the button below to reload the app.</p>
+        <div class="button-group" align="center">
+            <a data-role="button" class="button button-block" data-bind="events: { click: reloadApp }">Reload App</a>
         </div>
     </div>
 </div>

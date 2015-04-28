@@ -5,6 +5,9 @@ app.models.loading = (function() {
     
     var _showSection = function(sectionId) {
         $('#div-loading').hide();
+        $('#initialize-data').hide();
+        $('#initializing-data').hide();
+        
         $('#' + sectionId).show();
     };
     
@@ -39,14 +42,16 @@ app.models.loading = (function() {
     };
     
     var _initializeData = function() {
+        _showSection('initializing-data');
+        
         _createContentTypes()
         .then(_createUsers)
-        //.then(_createData)
+        .then(_createData)
         .then(function() {
-            alert('success');
+            _showSection('initialize-data-completed');
         })
-        .catch(function() {
-            alert('error');
+        .catch(function(e) {
+            alert('Error: ' + JSON.stringify(error));
         });
         
     };
@@ -144,6 +149,9 @@ app.models.loading = (function() {
         //
         initializeData: function() {
             _initializeData();
+        },
+        reloadApp: function() {
+            location.reload();
         }
     };
 })();

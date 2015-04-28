@@ -3,8 +3,7 @@ var sampleData = {
         "DeliveryOrder": {
             "Name": "DeliveryOrder",
             "Title": "DeliveryOrder",
-            //"SecurityPolicy": 3,
-            //"DisplayFieldName": "DeliveryItem",
+            "DisplayFieldName": "DeliveryItem",
             "Fields": [
                 {
                     "Name": "DeliveryAddressLine2",
@@ -82,7 +81,8 @@ var sampleData = {
                 "DeliveryAddressPostcode": "WA 98103-3920",
                 "DeliveryItemType": "Documents",
                 "DeliveryName": "John Smith",
-                "DeliveryItem": "Tax forms"
+                "DeliveryItem": "Tax forms",
+                "Status": 1
             },
             {
                 "DeliveryAddressCity": "Seattle",
@@ -90,7 +90,8 @@ var sampleData = {
                 "DeliveryAddressPostcode": "WA 98116-4413",
                 "DeliveryItemType": "Electronics",
                 "DeliveryItem": "Kindle Paperwhite",
-                "DeliveryName": "Sarah Williams"
+                "DeliveryName": "Sarah Williams",
+                "Status": 1
             },
             {
                 "DeliveryItemType": "Books",
@@ -98,7 +99,8 @@ var sampleData = {
                 "DeliveryAddressPostcode": "WA 98104",
                 "DeliveryAddressLine1": "100 Main St",
                 "DeliveryItem": "Game of Thrones",
-                "DeliveryName": "Matrim Cauthon"
+                "DeliveryName": "Matrim Cauthon",
+                "Status": 1
             },
             {
                 "DeliveryAddressLine1": "122 Cherry St",
@@ -106,7 +108,8 @@ var sampleData = {
                 "DeliveryAddressPostcode": "WA 98104-2206",
                 "DeliveryItemType": "Electronics",
                 "DeliveryItem": "Macbook Air",
-                "DeliveryName": "Phil Johnson"
+                "DeliveryName": "Phil Johnson",
+                "Status": 2
             }
         ]
     }

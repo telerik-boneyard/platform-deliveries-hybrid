@@ -67,13 +67,13 @@
         var dataProvider = app.data.defaultprovider;
         if (isOnline) {
             app.showFooterSection('status-online');
-            dataProvider.offline(false);
+            dataProvider.online();
             if (app.canSync) {
                  dataProvider.sync();   
             }
         } else {
             app.showFooterSection('status-offline');
-            dataProvider.offline(true);
+            dataProvider.offline();
         }
     };
                     
