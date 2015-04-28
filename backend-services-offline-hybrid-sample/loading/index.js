@@ -106,6 +106,7 @@ app.models.loading = (function() {
     };
     
     var _ajaxRequestPromise = function(url, data) {
+        var RSVP = Everlive._common.rsvp;
         var promise = new RSVP.Promise(function(resolve, reject) {
             $.ajax({
                 method: "POST",
@@ -128,7 +129,6 @@ app.models.loading = (function() {
     
     return {
         onShow: function() {
-
             //Check if API key has been set
             var apiKeySet = _isApiKeySet();
             if (!apiKeySet) {
@@ -145,8 +145,6 @@ app.models.loading = (function() {
             }
             
         },
-        
-        //
         initializeData: function() {
             _initializeData();
         },
