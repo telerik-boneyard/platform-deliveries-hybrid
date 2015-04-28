@@ -4,13 +4,8 @@ Constants = {};
 //in order to initialize the required server-side items for the demo to function.
 Constants.System = {
     ApiKey: 'your-api-key-here',
-    MasterKey: '' 
+    MasterKey: 'your-master-key-here' 
 };
-
-//Constants.Role = {
-//    Manager: "507182e0-ce1c-11e4-9d62-e777a36e39bd",
-//    DeliveryGuy: "af3868f0-cd8d-11e4-b98c-ef0795308bb6"
-//};
 
 //The name of the server-side content types we use in the app
 Constants.Type = {

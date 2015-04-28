@@ -7,29 +7,14 @@
     </header>
     <div class="signin-view">
         <p>This is a sample app demonstrating the offline support in Telerik Backend Services JavaScript SDK.</p>
-        <h3>What it does</h3>
-        <p>This app is about making deliveries. There are two user roles - a manager and a delivery guy. The manager sees all delivery orders and can enter new ones. The delivery guy can see all delivery orders assigned to him and change their status. Both the manager and the delivery guy can comment on the delivery orders.</p>
-        <h3>Initializing data</h3>
-        <p>For your convenience this app can initialize your application with the required content types and sample data. Just click on the "Initialize Data" button from the initial screen.</p>
-        <h3>Testing offline storage</h3>
-        <p>For easier testing you can switch between offline and online with a click of a button. In your real apps, you will usually switch based on the actual connectivity of the device.</p>
-        <h3>What to test</h3>
-        <p>Here are some example scenarios you can test.</p>
-        <h4>Offline update</h4>
-        <p>
-            <ol>
-                <li>Log in as a delivery guy.</li>
-                <li>Make sure you are working online and the device has Internet connection.</li>
-                <li>Go to "My Orders" to see the delivery orders assigned to you.</li>
-                <li>Switch to offline mode.</li>
-                <li>Pick a delivery order and set its status to "Delivered".</li>
-                <li>From the Backend Services portal and check the status of that order.</li>
-                <li>Result: the status is not "Delivered" as the information has not been synchronized with the server.</li>
-                <li>In the app, switch to online mode. This will trigger the synchronization.</li>
-                <li>From the Backend Services Portal and check the status of the order.</li>
-                <li>Result: the status is now "Delivered".</li>
-            </ol>
-        </p>
+        <h3>What It Does</h3>
+        <p>This app is a simplified version of an app used to handle delivery orders. The employees making the deliveries use it to set the status of a delivery order and enter comments. They can work without Internet connection and all changes they make are synchronized to the cloud whenever the device gets back online.</p>
+        <h3>Testing Offline Storage</h3>
+        <p>In this sample the switch between offline and online mode is bound to the connectivity status of the device. If you are using the AppBuilder simulator, you can simulate offline mode from the Network Connection tab. If you are testing this app on a real device, you have to switch off the Internet connection in order to go in offline mode. For your convenience the current mode is always displayed in the bottom of the app.</p>
+        <h3>More Information</h3>
+        <p>For more information related to this sample, please go to <a href="http://docs.telerik.com/platform/backend-services/samples/deliveries/deliveries-sample">the Backend Services documentation</a>.</p>
+        <p>&nbsp;</p>
+        <p>&nbsp;</p>
 
     </div>
 </div>
