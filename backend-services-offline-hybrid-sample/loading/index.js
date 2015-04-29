@@ -12,11 +12,11 @@ app.models.loading = (function() {
     };
     
     var _isApiKeySet = function() {
-        return Constants.System.ApiKey && Constants.System.ApiKey.length === 16;
+        return Config.ApiKey && Config.ApiKey.length === 16;
     };
     
     var _isMasterKeySet = function() {
-        return Constants.System.MasterKey && Constants.System.MasterKey.length === 32;
+        return Config.MasterKey && Config.MasterKey.length === 32;
     };
     
     var _checkDataInitialized = function() {
@@ -67,7 +67,7 @@ app.models.loading = (function() {
         var fields = typeDefinition.Fields;
         delete typeDefinition.Fields;
         
-        var url = everliveBaseUrl + 'Metadata/Applications/' + Constants.System.ApiKey + '/Types';
+        var url = everliveBaseUrl + 'Metadata/Applications/' + Config.ApiKey + '/Types';
         return _ajaxRequestPromise(url, typeDefinition)
             .then(
                 function() {
@@ -77,19 +77,19 @@ app.models.loading = (function() {
     };
     
     var _createContentTypeFields = function(typeName, fields) {
-        var url = everliveBaseUrl + 'Metadata/Applications/' + Constants.System.ApiKey + '/Types/' + typeName + '/Fields';
+        var url = everliveBaseUrl + 'Metadata/Applications/' + Config.ApiKey + '/Types/' + typeName + '/Fields';
         return _ajaxRequestPromise(url, fields);
     };
     
     var _createData = function() {
         var data = sampleData.Data.DeliveryOrder;
-        var url = everliveBaseUrl + Constants.System.ApiKey + '/DeliveryOrder';
+        var url = everliveBaseUrl + Config.ApiKey + '/DeliveryOrder';
         return _ajaxRequestPromise(url, data);
     };
     
     var _createUsers = function() {
         var users = sampleData.Users;
-        var url = everliveBaseUrl + Constants.System.ApiKey + '/Users';
+        var url = everliveBaseUrl + Config.ApiKey + '/Users';
         return _ajaxRequestPromise(url, users);
     };
     
@@ -98,7 +98,7 @@ app.models.loading = (function() {
             method: "GET",
             url: url,
             headers: {
-                'Authorization': 'masterkey ' + Constants.System.MasterKey
+                'Authorization': 'masterkey ' + Config.MasterKey
             },
             success: success,
             error: error
@@ -112,7 +112,7 @@ app.models.loading = (function() {
                 method: "POST",
                 url: url,
                 headers: {
-                    'Authorization': 'masterkey ' + Constants.System.MasterKey,
+                    'Authorization': 'masterkey ' + Config.MasterKey,
                     'Content-Type': 'application/json'
                 },
                 data: JSON.stringify(data),

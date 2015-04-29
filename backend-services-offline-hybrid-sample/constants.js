@@ -1,12 +1,5 @@
 Constants = {};
 
-//WARNING: You must never include your master key in your app. We only use it
-//in order to initialize the required server-side items for the demo to function.
-Constants.System = {
-    ApiKey: 'your-api-key-here',
-    MasterKey: 'your-master-key-here' 
-};
-
 //The name of the server-side content types we use in the app
 Constants.Type = {
     DeliveryOrder: 'DeliveryOrder'
