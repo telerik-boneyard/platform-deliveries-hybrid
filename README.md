@@ -35,9 +35,9 @@ For your convenience, the app always displays whether it works online or offline
 
 ### What to test ###
 
-1. Make sure Internet connection is ON
-2. Login and browse the delivery orders.
-2. Go offline and restart the application.
+1. Make sure Internet connection is on.
+2. Log in and browse the delivery orders.
+2. Turn off the Internet connection and restart the application.
 3. Result: you can still browse the delivery orders.
 4. Change an existing item (enter comment or change status).
 5. Turn on the Internet connection.
