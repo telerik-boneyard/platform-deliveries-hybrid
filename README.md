@@ -1,4 +1,4 @@
-This application is an example for using the Offline Mode provided by the Telerik Backend Services JavaScript SDK. You can read more about Offline Mode in the [documentation](http://docs.telerik.com/platform/backend-services/development/javascript-sdk/offline-mode/introduction).
+This application is an example for using the Offline Mode provided by the Telerik Backend Services JavaScript SDK. You can find more information here: [Offline Mode](http://docs.telerik.com/platform/backend-services/development/javascript-sdk/offline-mode/introduction).
 
 ### Requirements ###
 
@@ -31,7 +31,7 @@ You can test this app either on a device or using the AppBuilder simulator. More
 
 This app requires a specific content type and some data in your Backend Services project in order to work. Just launch the app and it will guide you through the process of data initialization.
 
-For your convenience, the app always displays whether it works online or offline. You can simulate lack of Internet connection in the AppBuilder simulator. If you are testing on a device, you will have to turn off the WiFi and Data connection to go in offline mode.
+For your convenience, the app always displays whether it works online or offline. You can simulate lack of Internet connection from the AppBuilder simulator. If you are testing on a device, you will have to turn off the WiFi and data connection to go in offline mode.
 
 ### What to test ###
 
