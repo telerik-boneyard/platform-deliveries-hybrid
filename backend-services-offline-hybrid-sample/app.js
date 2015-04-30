@@ -32,6 +32,7 @@
                 if (navigator && navigator.splashscreen) {
                     navigator.splashscreen.hide();   
                 }
+				addConnectivityEventListeners();
                 bootstrap();
             },
             false
@@ -69,19 +70,24 @@
             app.showFooterSection('status-online');
             dataProvider.online();
             if (app.canSync) {
-                 dataProvider.sync();   
+				 // await the network connectivity to be established even that the 'online' event was thrown 
+                 setTimeout(function () { 
+					 dataProvider.sync();
+                 }, 1000);
             }
         } else {
             app.showFooterSection('status-offline');
             dataProvider.offline();
         }
     };
-                    
-    document.addEventListener("online", function() {
-        onConnectivityChanged(true);
-    });
-    
-    document.addEventListener("offline", function() {
-        onConnectivityChanged(false);
-    }); 
+             
+	function addConnectivityEventListeners() {
+		document.addEventListener("online", function() {
+	        onConnectivityChanged(true);
+	    });
+	    
+	    document.addEventListener("offline", function() {
+	        onConnectivityChanged(false);
+		});		
+	}
 }());
