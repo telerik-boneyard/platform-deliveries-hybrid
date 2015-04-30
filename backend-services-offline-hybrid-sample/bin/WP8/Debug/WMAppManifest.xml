@@ -1,0 +1,35 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Deployment AppPlatformVersion="8.0" xmlns="http://schemas.microsoft.com/windowsphone/2012/deployment">
+  <DefaultLanguage code="en-US" xmlns="" />
+  <Languages xmlns="">
+    <Language code="en-US" />
+  </Languages>
+  <App BitsPerPixel="32" Genre="apps.normal" Description="Deliveries" PublisherID="{b5110148-9027-4ce6-9173-3248eb9aa360}" Publisher="Anton Dobrev" Author="Anton Dobrev" RuntimeType="Silverlight" Title="Deliveries" Version="1.0" ProductID="{2f985815-38af-44f6-bbca-f476cffb6fba}" xmlns="">
+    <IconPath IsRelative="true" IsResource="false">App_Resources\WP8\ApplicationIcon.png</IconPath>
+    <Capabilities>
+      <!--NOTE: During the build process, this section is merged with settings from the Project Properties. -->
+      <Capability Name="ID_CAP_WEBBROWSERCOMPONENT" />
+    </Capabilities>
+    <Tasks>
+      <DefaultTask Name="_default" NavigationPage="MainPage.xaml" />
+    </Tasks>
+    <Tokens>
+      <PrimaryToken TaskName="_default" TokenID="AppBuilder1Token">
+        <TemplateIconic>
+          <SmallImageURI IsRelative="true" IsResource="false">App_Resources\WP8\Tiles\Iconic\110x110.png</SmallImageURI>
+          <Count>0</Count>
+          <IconImageURI IsRelative="true" IsResource="false">App_Resources\WP8\Tiles\Iconic\202x202.png</IconImageURI>
+          <Title></Title>
+          <HasLarge>false</HasLarge>
+          <DeviceLockImageURI IsRelative="true" IsResource="false" />
+        </TemplateIconic>
+      </PrimaryToken>
+    </Tokens>
+    <ScreenResolutions>
+      <!--NOTE: During the build process, this section is merged with settings from the Project Properties. -->
+      <ScreenResolution Name="ID_RESOLUTION_WVGA" />
+      <ScreenResolution Name="ID_RESOLUTION_WXGA" />
+      <ScreenResolution Name="ID_RESOLUTION_HD720P" />
+    </ScreenResolutions>
+  </App>
+</Deployment>

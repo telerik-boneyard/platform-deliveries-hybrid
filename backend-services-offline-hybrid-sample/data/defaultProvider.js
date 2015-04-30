@@ -19,10 +19,14 @@
         app.showFooterSection('status-synchronizing');
     });
     
-    app.data.defaultprovider.on('syncEnd', function(err) {
+    app.data.defaultprovider.on('syncEnd', function(syncInfo) {
+		var err = syncInfo.error;
         if (err) {
-            alert(JSON.stringify(err));
-        }
+        	alert('An error occurred while syncing' + JSON.stringify(err));
+    	} else if (err === '') {
+        	alert('An error occurred while syncing');
+    	} 
+		
         app.showFooterSection('status-synchronizing-done');
         setTimeout(function() {
             app.showFooterSection('status-online');
