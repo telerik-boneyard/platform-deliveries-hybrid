@@ -47,6 +47,7 @@ app.models.loading = (function() {
         _createContentTypes()
         .then(_createUsers)
         .then(_createData)
+        .then(_createFiles)
         .then(function() {
             _showSection('initialize-data-completed');
         })
@@ -92,6 +93,15 @@ app.models.loading = (function() {
         var url = everliveBaseUrl + Config.ApiKey + '/Users';
         return _ajaxRequestPromise(url, users);
     };
+    
+    var _createFiles = function() {
+        var files = sampleData.Data.Files;
+        var url = everliveBaseUrl + Config.ApiKey + '/Files';
+        return _ajaxRequestPromise(url, files[0])
+        .then(function() {
+            return _ajaxRequestPromise(url, files[1]);
+        });
+    }
     
     var _get = function(url, success, error) {
         $.ajax({

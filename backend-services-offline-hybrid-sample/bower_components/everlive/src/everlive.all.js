@@ -17958,7 +17958,7 @@ module.exports = (function () {
         this._everlive = everlive;
         this._settings = {
             urlTemplate: '[protocol][hostname][apikey]/[operations][url]',
-            server: '192.168.133.155:8090/image/v1/'
+            server: 'bs1.cdn.telerik.com/image/v1/'
         };
 
         if (config === true) {
