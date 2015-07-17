@@ -288,6 +288,16 @@
   font-size: 1.25em;
 }
 
+.item-img {
+    display: block;
+    padding: 10px 0;
+}
+
+.item-img img {
+    display: block;
+    width: 100%;
+}
+
 .item-value .km-icon {
   display: inline-block;
 }
