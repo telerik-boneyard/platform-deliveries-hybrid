@@ -7,6 +7,7 @@
         apiKey: Config.ApiKey,
         scheme: 'https',
         offlineStorage: true,
+        caching: true,
         authentication: {
             persist: true,
             onAuthenticationRequired: function() {
