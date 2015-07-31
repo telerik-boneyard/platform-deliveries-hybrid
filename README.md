@@ -1,11 +1,11 @@
-This application is an example for using the Offline Mode provided by the Telerik Backend Services JavaScript SDK. You can find more information here: [Offline Mode](http://docs.telerik.com/platform/backend-services/development/javascript-sdk/offline-mode/introduction).
+This application is an example for using the Offline Support provided by the Telerik Backend Services JavaScript SDK. You can find more information here: [Offline Support](http://docs.telerik.com/platform/backend-services/development/javascript-sdk/offline-mode/introduction).
 
 ### Requirements ###
 
 * Registration in Telerik Platform (https://platform.telerik.com/).
 * A new or existing Backend Services project.
 
-### Showcased concepts of Offline Mode ###
+### Showcased concepts of Offline Support ###
 
 * Switching between online and offline mode
 * Data synchronization
