@@ -18821,7 +18821,7 @@ module.exports = (function () {
  */
 /*!
  Everlive SDK
- Version 1.4.1
+ Version 1.5.1
  */
 (function () {
     var Everlive = require('./Everlive');
