@@ -5,13 +5,16 @@ This application is an example for using the Offline Support provided by the Tel
 * Registration in Telerik Platform (https://platform.telerik.com/).
 * A new or existing Backend Services project.
 
-### Showcased concepts of Offline Support ###
+### Showcased concepts ###
 
-* Switching between online and offline mode
-* Data synchronization
-* ClientWins conflict resolution strategy
-* Integration with UI
-* Integration with authentication
+* Offline Support
+  * Switching between online and offline mode
+  * Data synchronization
+  * ClientWins conflict resolution strategy
+  * Offline files
+  * Integration with UI
+* Caching
+* Authentication Persistance
 
 ### Supported platforms ###
 
