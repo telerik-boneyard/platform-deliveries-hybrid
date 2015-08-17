@@ -70,12 +70,12 @@ app.models.signInView.signInView = (function() {
         },
         signInAndy: function() {
             var username = 'andy';
-            var password = '111111';
+            var password = '333333';
             _signin(username, password);
         },
         signInMichael: function() {
             var username = 'michael';
-            var password = '111111';
+            var password = '333333';
             _signin(username, password);
         }
     });

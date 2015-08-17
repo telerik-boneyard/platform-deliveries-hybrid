@@ -1,67 +1,4 @@
 (function () { if (typeof module === "object") { var everliveModule = module; } if (typeof define !== "undefined" && define.amd) { define(function() { return Everlive; }); } (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-;(function () {
-
-  var object = typeof exports != 'undefined' ? exports : this; // #8: web workers
-  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-
-  function InvalidCharacterError(message) {
-    this.message = message;
-  }
-  InvalidCharacterError.prototype = new Error;
-  InvalidCharacterError.prototype.name = 'InvalidCharacterError';
-
-  // encoder
-  // [https://gist.github.com/999166] by [https://github.com/nignag]
-  object.btoa || (
-  object.btoa = function (input) {
-    var str = String(input);
-    for (
-      // initialize result and counter
-      var block, charCode, idx = 0, map = chars, output = '';
-      // if the next str index does not exist:
-      //   change the mapping table to "="
-      //   check if d has no fractional digits
-      str.charAt(idx | 0) || (map = '=', idx % 1);
-      // "8 - idx % 1 * 8" generates the sequence 2, 4, 6, 8
-      output += map.charAt(63 & block >> 8 - idx % 1 * 8)
-    ) {
-      charCode = str.charCodeAt(idx += 3/4);
-      if (charCode > 0xFF) {
-        throw new InvalidCharacterError("'btoa' failed: The string to be encoded contains characters outside of the Latin1 range.");
-      }
-      block = block << 8 | charCode;
-    }
-    return output;
-  });
-
-  // decoder
-  // [https://gist.github.com/1020396] by [https://github.com/atk]
-  object.atob || (
-  object.atob = function (input) {
-    var str = String(input).replace(/=+$/, '');
-    if (str.length % 4 == 1) {
-      throw new InvalidCharacterError("'atob' failed: The string to be decoded is not correctly encoded.");
-    }
-    for (
-      // initialize result and counters
-      var bc = 0, bs, buffer, idx = 0, output = '';
-      // get next character
-      buffer = str.charAt(idx++);
-      // character found in table? initialize bit storage and add its ascii value;
-      ~buffer && (bs = bc % 4 ? bs * 64 + buffer : buffer,
-        // and if not first of each 4 characters,
-        // convert the first 8 bits to one ascii character
-        bc++ % 4) ? output += String.fromCharCode(255 & bs >> (-2 * bc & 6)) : 0
-    ) {
-      // try to find character in table (0-63, not found => -1)
-      buffer = chars.indexOf(buffer);
-    }
-    return output;
-  });
-
-}());
-
-},{}],2:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -364,7 +301,7 @@ function isUndefined(arg) {
   return arg === void 0;
 }
 
-},{}],3:[function(require,module,exports){
+},{}],2:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -389,7 +326,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],4:[function(require,module,exports){
+},{}],3:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -617,71 +554,38 @@ var substr = 'ab'.substr(-1) === 'b'
 ;
 
 }).call(this,require('_process'))
-
-},{"_process":5}],5:[function(require,module,exports){
+},{"_process":4}],4:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
 var queue = [];
 var draining = false;
-var currentQueue;
-var queueIndex = -1;
-
-function cleanUpNextTick() {
-    draining = false;
-    if (currentQueue.length) {
-        queue = currentQueue.concat(queue);
-    } else {
-        queueIndex = -1;
-    }
-    if (queue.length) {
-        drainQueue();
-    }
-}
 
 function drainQueue() {
     if (draining) {
         return;
     }
-    var timeout = setTimeout(cleanUpNextTick);
     draining = true;
-
+    var currentQueue;
     var len = queue.length;
     while(len) {
         currentQueue = queue;
         queue = [];
-        while (++queueIndex < len) {
-            currentQueue[queueIndex].run();
+        var i = -1;
+        while (++i < len) {
+            currentQueue[i]();
         }
-        queueIndex = -1;
         len = queue.length;
     }
-    currentQueue = null;
     draining = false;
-    clearTimeout(timeout);
 }
-
 process.nextTick = function (fun) {
-    var args = new Array(arguments.length - 1);
-    if (arguments.length > 1) {
-        for (var i = 1; i < arguments.length; i++) {
-            args[i - 1] = arguments[i];
-        }
-    }
-    queue.push(new Item(fun, args));
-    if (queue.length === 1 && !draining) {
+    queue.push(fun);
+    if (!draining) {
         setTimeout(drainQueue, 0);
     }
 };
 
-// v8 likes predictible objects
-function Item(fun, array) {
-    this.fun = fun;
-    this.array = array;
-}
-Item.prototype.run = function () {
-    this.fun.apply(null, this.array);
-};
 process.title = 'browser';
 process.browser = true;
 process.env = {};
@@ -710,14 +614,14 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],6:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 module.exports = function isBuffer(arg) {
   return arg && typeof arg === 'object'
     && typeof arg.copy === 'function'
     && typeof arg.fill === 'function'
     && typeof arg.readUInt8 === 'function';
 }
-},{}],7:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -1307,8 +1211,527 @@ function hasOwnProperty(obj, prop) {
 }
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"./support/isBuffer":5,"_process":4,"inherits":2}],7:[function(require,module,exports){
+var json = typeof JSON !== 'undefined' ? JSON : require('jsonify');
 
-},{"./support/isBuffer":6,"_process":5,"inherits":3}],8:[function(require,module,exports){
+module.exports = function (obj, opts) {
+    if (!opts) opts = {};
+    if (typeof opts === 'function') opts = { cmp: opts };
+    var space = opts.space || '';
+    if (typeof space === 'number') space = Array(space+1).join(' ');
+    var cycles = (typeof opts.cycles === 'boolean') ? opts.cycles : false;
+    var replacer = opts.replacer || function(key, value) { return value; };
+
+    var cmp = opts.cmp && (function (f) {
+        return function (node) {
+            return function (a, b) {
+                var aobj = { key: a, value: node[a] };
+                var bobj = { key: b, value: node[b] };
+                return f(aobj, bobj);
+            };
+        };
+    })(opts.cmp);
+
+    var seen = [];
+    return (function stringify (parent, key, node, level) {
+        var indent = space ? ('\n' + new Array(level + 1).join(space)) : '';
+        var colonSeparator = space ? ': ' : ':';
+
+        if (node && node.toJSON && typeof node.toJSON === 'function') {
+            node = node.toJSON();
+        }
+
+        node = replacer.call(parent, key, node);
+
+        if (node === undefined) {
+            return;
+        }
+        if (typeof node !== 'object' || node === null) {
+            return json.stringify(node);
+        }
+        if (isArray(node)) {
+            var out = [];
+            for (var i = 0; i < node.length; i++) {
+                var item = stringify(node, i, node[i], level+1) || json.stringify(null);
+                out.push(indent + space + item);
+            }
+            return '[' + out.join(',') + indent + ']';
+        }
+        else {
+            if (seen.indexOf(node) !== -1) {
+                if (cycles) return json.stringify('__cycle__');
+                throw new TypeError('Converting circular structure to JSON');
+            }
+            else seen.push(node);
+
+            var keys = objectKeys(node).sort(cmp && cmp(node));
+            var out = [];
+            for (var i = 0; i < keys.length; i++) {
+                var key = keys[i];
+                var value = stringify(node, key, node[key], level+1);
+
+                if(!value) continue;
+
+                var keyValue = json.stringify(key)
+                    + colonSeparator
+                    + value;
+                ;
+                out.push(indent + space + keyValue);
+            }
+            return '{' + out.join(',') + indent + '}';
+        }
+    })({ '': obj }, '', obj, 0);
+};
+
+var isArray = Array.isArray || function (x) {
+    return {}.toString.call(x) === '[object Array]';
+};
+
+var objectKeys = Object.keys || function (obj) {
+    var has = Object.prototype.hasOwnProperty || function () { return true };
+    var keys = [];
+    for (var key in obj) {
+        if (has.call(obj, key)) keys.push(key);
+    }
+    return keys;
+};
+
+},{"jsonify":8}],8:[function(require,module,exports){
+exports.parse = require('./lib/parse');
+exports.stringify = require('./lib/stringify');
+
+},{"./lib/parse":9,"./lib/stringify":10}],9:[function(require,module,exports){
+var at, // The index of the current character
+    ch, // The current character
+    escapee = {
+        '"':  '"',
+        '\\': '\\',
+        '/':  '/',
+        b:    '\b',
+        f:    '\f',
+        n:    '\n',
+        r:    '\r',
+        t:    '\t'
+    },
+    text,
+
+    error = function (m) {
+        // Call error when something is wrong.
+        throw {
+            name:    'SyntaxError',
+            message: m,
+            at:      at,
+            text:    text
+        };
+    },
+    
+    next = function (c) {
+        // If a c parameter is provided, verify that it matches the current character.
+        if (c && c !== ch) {
+            error("Expected '" + c + "' instead of '" + ch + "'");
+        }
+        
+        // Get the next character. When there are no more characters,
+        // return the empty string.
+        
+        ch = text.charAt(at);
+        at += 1;
+        return ch;
+    },
+    
+    number = function () {
+        // Parse a number value.
+        var number,
+            string = '';
+        
+        if (ch === '-') {
+            string = '-';
+            next('-');
+        }
+        while (ch >= '0' && ch <= '9') {
+            string += ch;
+            next();
+        }
+        if (ch === '.') {
+            string += '.';
+            while (next() && ch >= '0' && ch <= '9') {
+                string += ch;
+            }
+        }
+        if (ch === 'e' || ch === 'E') {
+            string += ch;
+            next();
+            if (ch === '-' || ch === '+') {
+                string += ch;
+                next();
+            }
+            while (ch >= '0' && ch <= '9') {
+                string += ch;
+                next();
+            }
+        }
+        number = +string;
+        if (!isFinite(number)) {
+            error("Bad number");
+        } else {
+            return number;
+        }
+    },
+    
+    string = function () {
+        // Parse a string value.
+        var hex,
+            i,
+            string = '',
+            uffff;
+        
+        // When parsing for string values, we must look for " and \ characters.
+        if (ch === '"') {
+            while (next()) {
+                if (ch === '"') {
+                    next();
+                    return string;
+                } else if (ch === '\\') {
+                    next();
+                    if (ch === 'u') {
+                        uffff = 0;
+                        for (i = 0; i < 4; i += 1) {
+                            hex = parseInt(next(), 16);
+                            if (!isFinite(hex)) {
+                                break;
+                            }
+                            uffff = uffff * 16 + hex;
+                        }
+                        string += String.fromCharCode(uffff);
+                    } else if (typeof escapee[ch] === 'string') {
+                        string += escapee[ch];
+                    } else {
+                        break;
+                    }
+                } else {
+                    string += ch;
+                }
+            }
+        }
+        error("Bad string");
+    },
+
+    white = function () {
+
+// Skip whitespace.
+
+        while (ch && ch <= ' ') {
+            next();
+        }
+    },
+
+    word = function () {
+
+// true, false, or null.
+
+        switch (ch) {
+        case 't':
+            next('t');
+            next('r');
+            next('u');
+            next('e');
+            return true;
+        case 'f':
+            next('f');
+            next('a');
+            next('l');
+            next('s');
+            next('e');
+            return false;
+        case 'n':
+            next('n');
+            next('u');
+            next('l');
+            next('l');
+            return null;
+        }
+        error("Unexpected '" + ch + "'");
+    },
+
+    value,  // Place holder for the value function.
+
+    array = function () {
+
+// Parse an array value.
+
+        var array = [];
+
+        if (ch === '[') {
+            next('[');
+            white();
+            if (ch === ']') {
+                next(']');
+                return array;   // empty array
+            }
+            while (ch) {
+                array.push(value());
+                white();
+                if (ch === ']') {
+                    next(']');
+                    return array;
+                }
+                next(',');
+                white();
+            }
+        }
+        error("Bad array");
+    },
+
+    object = function () {
+
+// Parse an object value.
+
+        var key,
+            object = {};
+
+        if (ch === '{') {
+            next('{');
+            white();
+            if (ch === '}') {
+                next('}');
+                return object;   // empty object
+            }
+            while (ch) {
+                key = string();
+                white();
+                next(':');
+                if (Object.hasOwnProperty.call(object, key)) {
+                    error('Duplicate key "' + key + '"');
+                }
+                object[key] = value();
+                white();
+                if (ch === '}') {
+                    next('}');
+                    return object;
+                }
+                next(',');
+                white();
+            }
+        }
+        error("Bad object");
+    };
+
+value = function () {
+
+// Parse a JSON value. It could be an object, an array, a string, a number,
+// or a word.
+
+    white();
+    switch (ch) {
+    case '{':
+        return object();
+    case '[':
+        return array();
+    case '"':
+        return string();
+    case '-':
+        return number();
+    default:
+        return ch >= '0' && ch <= '9' ? number() : word();
+    }
+};
+
+// Return the json_parse function. It will have access to all of the above
+// functions and variables.
+
+module.exports = function (source, reviver) {
+    var result;
+    
+    text = source;
+    at = 0;
+    ch = ' ';
+    result = value();
+    white();
+    if (ch) {
+        error("Syntax error");
+    }
+
+    // If there is a reviver function, we recursively walk the new structure,
+    // passing each name/value pair to the reviver function for possible
+    // transformation, starting with a temporary root object that holds the result
+    // in an empty key. If there is not a reviver function, we simply return the
+    // result.
+
+    return typeof reviver === 'function' ? (function walk(holder, key) {
+        var k, v, value = holder[key];
+        if (value && typeof value === 'object') {
+            for (k in value) {
+                if (Object.prototype.hasOwnProperty.call(value, k)) {
+                    v = walk(value, k);
+                    if (v !== undefined) {
+                        value[k] = v;
+                    } else {
+                        delete value[k];
+                    }
+                }
+            }
+        }
+        return reviver.call(holder, key, value);
+    }({'': result}, '')) : result;
+};
+
+},{}],10:[function(require,module,exports){
+var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
+    escapable = /[\\\"\x00-\x1f\x7f-\x9f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
+    gap,
+    indent,
+    meta = {    // table of character substitutions
+        '\b': '\\b',
+        '\t': '\\t',
+        '\n': '\\n',
+        '\f': '\\f',
+        '\r': '\\r',
+        '"' : '\\"',
+        '\\': '\\\\'
+    },
+    rep;
+
+function quote(string) {
+    // If the string contains no control characters, no quote characters, and no
+    // backslash characters, then we can safely slap some quotes around it.
+    // Otherwise we must also replace the offending characters with safe escape
+    // sequences.
+    
+    escapable.lastIndex = 0;
+    return escapable.test(string) ? '"' + string.replace(escapable, function (a) {
+        var c = meta[a];
+        return typeof c === 'string' ? c :
+            '\\u' + ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+    }) + '"' : '"' + string + '"';
+}
+
+function str(key, holder) {
+    // Produce a string from holder[key].
+    var i,          // The loop counter.
+        k,          // The member key.
+        v,          // The member value.
+        length,
+        mind = gap,
+        partial,
+        value = holder[key];
+    
+    // If the value has a toJSON method, call it to obtain a replacement value.
+    if (value && typeof value === 'object' &&
+            typeof value.toJSON === 'function') {
+        value = value.toJSON(key);
+    }
+    
+    // If we were called with a replacer function, then call the replacer to
+    // obtain a replacement value.
+    if (typeof rep === 'function') {
+        value = rep.call(holder, key, value);
+    }
+    
+    // What happens next depends on the value's type.
+    switch (typeof value) {
+        case 'string':
+            return quote(value);
+        
+        case 'number':
+            // JSON numbers must be finite. Encode non-finite numbers as null.
+            return isFinite(value) ? String(value) : 'null';
+        
+        case 'boolean':
+        case 'null':
+            // If the value is a boolean or null, convert it to a string. Note:
+            // typeof null does not produce 'null'. The case is included here in
+            // the remote chance that this gets fixed someday.
+            return String(value);
+            
+        case 'object':
+            if (!value) return 'null';
+            gap += indent;
+            partial = [];
+            
+            // Array.isArray
+            if (Object.prototype.toString.apply(value) === '[object Array]') {
+                length = value.length;
+                for (i = 0; i < length; i += 1) {
+                    partial[i] = str(i, value) || 'null';
+                }
+                
+                // Join all of the elements together, separated with commas, and
+                // wrap them in brackets.
+                v = partial.length === 0 ? '[]' : gap ?
+                    '[\n' + gap + partial.join(',\n' + gap) + '\n' + mind + ']' :
+                    '[' + partial.join(',') + ']';
+                gap = mind;
+                return v;
+            }
+            
+            // If the replacer is an array, use it to select the members to be
+            // stringified.
+            if (rep && typeof rep === 'object') {
+                length = rep.length;
+                for (i = 0; i < length; i += 1) {
+                    k = rep[i];
+                    if (typeof k === 'string') {
+                        v = str(k, value);
+                        if (v) {
+                            partial.push(quote(k) + (gap ? ': ' : ':') + v);
+                        }
+                    }
+                }
+            }
+            else {
+                // Otherwise, iterate through all of the keys in the object.
+                for (k in value) {
+                    if (Object.prototype.hasOwnProperty.call(value, k)) {
+                        v = str(k, value);
+                        if (v) {
+                            partial.push(quote(k) + (gap ? ': ' : ':') + v);
+                        }
+                    }
+                }
+            }
+            
+        // Join all of the member texts together, separated with commas,
+        // and wrap them in braces.
+
+        v = partial.length === 0 ? '{}' : gap ?
+            '{\n' + gap + partial.join(',\n' + gap) + '\n' + mind + '}' :
+            '{' + partial.join(',') + '}';
+        gap = mind;
+        return v;
+    }
+}
+
+module.exports = function (value, replacer, space) {
+    var i;
+    gap = '';
+    indent = '';
+    
+    // If the space parameter is a number, make an indent string containing that
+    // many spaces.
+    if (typeof space === 'number') {
+        for (i = 0; i < space; i += 1) {
+            indent += ' ';
+        }
+    }
+    // If the space parameter is a string, it will be used as the indent string.
+    else if (typeof space === 'string') {
+        indent = space;
+    }
+
+    // If there is a replacer, it must be a function or an array.
+    // Otherwise, throw an error.
+    rep = replacer;
+    if (replacer && typeof replacer !== 'function'
+    && (typeof replacer !== 'object' || typeof replacer.length !== 'number')) {
+        throw new Error('JSON.stringify');
+    }
+    
+    // Make a fake root object containing our value under the key of ''.
+    // Return the result of stringifying the value.
+    return str('', {'': value});
+};
+
+},{}],11:[function(require,module,exports){
 /**
  * This script gives you the zone info key representing your device's time zone setting.
  *
@@ -1669,7 +2092,7 @@ function hasOwnProperty(obj, prop) {
 })(this);
 
 
-},{}],9:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 // Mingo.js 0.4.0
 // Copyright (c) 2015 Francis Asante <kofrasa@gmail.com>
 // MIT
@@ -1952,9 +2375,9 @@ function hasOwnProperty(obj, prop) {
         _.extend(this._operators, {"$project": this._projection});
       }
 
-      // if (!_.isArray(this._collection) && !_.isObject(this._collection)) {
-      //   throw new Error("Input collection is not of valid type. Must be an Array.");
-      // }
+      if (!_.isArray(this._collection) && !_.isObject(this._collection)) {
+        throw new Error("Input collection is not of valid type. Must be an Array.");
+      }
 
       // filter collection
       this._result = _.filter(this._collection, this._query.test, this._query);
@@ -2305,15 +2728,6 @@ function hasOwnProperty(obj, prop) {
       if (_.isEmpty(expr)) {
         return collection;
       }
-      var usesExclusion = false;
-      _.each(expr, function(val, key) {
-        if(val === 0 && key !== settings.key) {
-           usesExclusion = true;
-        }
-        if(val !== 0 && usesExclusion) {
-            throw new Error("You cannot mix including and excluding fields."); 
-        }
-      });
 
       // result collection
       var projected = [];
@@ -3567,8 +3981,7 @@ function hasOwnProperty(obj, prop) {
   }
 
 }(this));
-
-},{"stream":"stream","underscore":32,"util":7}],10:[function(require,module,exports){
+},{"stream":"stream","underscore":35,"util":6}],13:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -3712,7 +4125,7 @@ function compare(matcher, val){
   }
 }
 
-},{"./ops":21,"component-type":13,"debug":14,"dot-component":17,"mongo-eql":19,"object-component":20}],11:[function(require,module,exports){
+},{"./ops":24,"component-type":16,"debug":17,"dot-component":20,"mongo-eql":22,"object-component":23}],14:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -3828,7 +4241,7 @@ function query(obj, query, update, opts){
   return log;
 }
 
-},{"./filter":10,"./mods":12,"component-type":13,"debug":14,"dot-component":17,"object-component":20}],12:[function(require,module,exports){
+},{"./filter":13,"./mods":15,"component-type":16,"debug":17,"dot-component":20,"object-component":23}],15:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -4445,7 +4858,7 @@ function numeric(val){
   return 'number' == type(val) || Number(val) == val;
 }
 
-},{"component-type":13,"debug":14,"dot-component":17,"mongo-eql":19,"object-component":20}],13:[function(require,module,exports){
+},{"component-type":16,"debug":17,"dot-component":20,"mongo-eql":22,"object-component":23}],16:[function(require,module,exports){
 /**
  * toString ref.
  */
@@ -4481,7 +4894,7 @@ module.exports = function(val){
   return typeof val;
 };
 
-},{}],14:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 
 /**
  * This is the web browser implementation of `debug()`.
@@ -4495,10 +4908,17 @@ exports.formatArgs = formatArgs;
 exports.save = save;
 exports.load = load;
 exports.useColors = useColors;
-exports.storage = 'undefined' != typeof chrome
-               && 'undefined' != typeof chrome.storage
-                  ? chrome.storage.local
-                  : localstorage();
+
+/**
+ * Use chrome.storage.local if we are in an app
+ */
+
+var storage;
+
+if (typeof chrome !== 'undefined' && typeof chrome.storage !== 'undefined')
+  storage = chrome.storage.local;
+else
+  storage = localstorage();
 
 /**
  * Colors.
@@ -4606,9 +5026,9 @@ function log() {
 function save(namespaces) {
   try {
     if (null == namespaces) {
-      exports.storage.removeItem('debug');
+      storage.removeItem('debug');
     } else {
-      exports.storage.debug = namespaces;
+      storage.debug = namespaces;
     }
   } catch(e) {}
 }
@@ -4623,7 +5043,7 @@ function save(namespaces) {
 function load() {
   var r;
   try {
-    r = exports.storage.debug;
+    r = storage.debug;
   } catch(e) {}
   return r;
 }
@@ -4651,7 +5071,7 @@ function localstorage(){
   } catch (e) {}
 }
 
-},{"./debug":15}],15:[function(require,module,exports){
+},{"./debug":18}],18:[function(require,module,exports){
 
 /**
  * This is the common logic for both the Node.js and web browser
@@ -4850,7 +5270,7 @@ function coerce(val) {
   return val;
 }
 
-},{"ms":16}],16:[function(require,module,exports){
+},{"ms":19}],19:[function(require,module,exports){
 /**
  * Helpers.
  */
@@ -4891,8 +5311,6 @@ module.exports = function(val, options){
  */
 
 function parse(str) {
-  str = '' + str;
-  if (str.length > 10000) return;
   var match = /^((?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$/i.exec(str);
   if (!match) return;
   var n = parseFloat(match[1]);
@@ -4977,7 +5395,7 @@ function plural(ms, n, name) {
   return Math.ceil(ms / n) + ' ' + name + 's';
 }
 
-},{}],17:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -5061,7 +5479,7 @@ function parent(obj, key, init){
   }
 }
 
-},{"type-component":18}],18:[function(require,module,exports){
+},{"type-component":21}],21:[function(require,module,exports){
 
 /**
  * toString ref.
@@ -5093,7 +5511,7 @@ module.exports = function(val){
   return typeof val;
 };
 
-},{}],19:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -5164,7 +5582,7 @@ function eql(matcher, val){
   }
 }
 
-},{"component-type":13}],20:[function(require,module,exports){
+},{"component-type":16}],23:[function(require,module,exports){
 
 /**
  * HOP ref.
@@ -5249,7 +5667,7 @@ exports.length = function(obj){
 exports.isEmpty = function(obj){
   return 0 == exports.length(obj);
 };
-},{}],21:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -5348,7 +5766,7 @@ exports.$size = function(matcher, val){
   return Array.isArray(val) && matcher == val.length;
 };
 
-},{"component-type":13,"mongo-eql":19}],22:[function(require,module,exports){
+},{"component-type":16,"mongo-eql":22}],25:[function(require,module,exports){
 var CryptoJS = require('./lib/core').CryptoJS;
 require('./lib/enc-base64');
 require('./lib/md5');
@@ -5359,7 +5777,7 @@ var JsonFormatter = require('./lib/jsonformatter').JsonFormatter;
 
 exports.CryptoJS = CryptoJS;
 exports.JsonFormatter = JsonFormatter;
-},{"./lib/aes":23,"./lib/cipher-core":24,"./lib/core":25,"./lib/enc-base64":26,"./lib/evpkdf":27,"./lib/jsonformatter":28,"./lib/md5":29}],23:[function(require,module,exports){
+},{"./lib/aes":26,"./lib/cipher-core":27,"./lib/core":28,"./lib/enc-base64":29,"./lib/evpkdf":30,"./lib/jsonformatter":31,"./lib/md5":32}],26:[function(require,module,exports){
 var CryptoJS = require('./core').CryptoJS;
 
 /*
@@ -5576,7 +5994,7 @@ code.google.com/p/crypto-js/wiki/License
     C.AES = BlockCipher._createHelper(AES);
 }());
 
-},{"./core":25}],24:[function(require,module,exports){
+},{"./core":28}],27:[function(require,module,exports){
 var CryptoJS = require('./core').CryptoJS;
 
 /*
@@ -6443,7 +6861,7 @@ CryptoJS.lib.Cipher || (function (undefined) {
     });
 }());
 
-},{"./core":25}],25:[function(require,module,exports){
+},{"./core":28}],28:[function(require,module,exports){
 /*
 CryptoJS v3.1.2
 code.google.com/p/crypto-js
@@ -7159,7 +7577,7 @@ var CryptoJS = CryptoJS || (function (Math, undefined) {
 
 exports.CryptoJS = CryptoJS;
 
-},{}],26:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 var CryptoJS = require('./core').CryptoJS;
 
 /*
@@ -7272,7 +7690,7 @@ code.google.com/p/crypto-js/wiki/License
     };
 }());
 
-},{"./core":25}],27:[function(require,module,exports){
+},{"./core":28}],30:[function(require,module,exports){
 var CryptoJS = require('./core').CryptoJS;
 
 /*
@@ -7394,7 +7812,7 @@ code.google.com/p/crypto-js/wiki/License
     };
 }());
 
-},{"./core":25}],28:[function(require,module,exports){
+},{"./core":28}],31:[function(require,module,exports){
 var CryptoJS = require('./core').CryptoJS;
 
 // create custom json serialization format
@@ -7441,7 +7859,7 @@ var JsonFormatter = {
 };
 
 exports.JsonFormatter = JsonFormatter;
-},{"./core":25}],29:[function(require,module,exports){
+},{"./core":28}],32:[function(require,module,exports){
 var CryptoJS = require('./core').CryptoJS;
 
 /*
@@ -7699,7 +8117,7 @@ code.google.com/p/crypto-js/wiki/License
     C.HmacMD5 = Hasher._createHmacHelper(MD5);
 }(Math));
 
-},{"./core":25}],30:[function(require,module,exports){
+},{"./core":28}],33:[function(require,module,exports){
 /*!
   * Reqwest! A general purpose XHR connection manager
   * license MIT (c) Dustin Diaz 2014
@@ -8316,7 +8734,7 @@ code.google.com/p/crypto-js/wiki/License
   return reqwest
 });
 
-},{}],31:[function(require,module,exports){
+},{}],34:[function(require,module,exports){
 (function (process){
 /*!
  * @overview RSVP - a tiny implementation of Promises/A+.
@@ -9991,8 +10409,7 @@ code.google.com/p/crypto-js/wiki/License
 
 
 }).call(this,require('_process'))
-
-},{"_process":5}],32:[function(require,module,exports){
+},{"_process":4}],35:[function(require,module,exports){
 //     Underscore.js 1.8.3
 //     http://underscorejs.org
 //     (c) 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -11542,7 +11959,7 @@ code.google.com/p/crypto-js/wiki/License
   }
 }.call(this));
 
-},{}],33:[function(require,module,exports){
+},{}],36:[function(require,module,exports){
 'use strict';
 var Constants = {};
 Constants.DefaultTakeItemsCount = 50;
@@ -11559,7 +11976,7 @@ Constants.IdFieldNameClient = 'Id';
 Constants.TargetTypeNameFieldName = 'TargetTypeName';
 
 module.exports = Constants;
-},{}],34:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
 'use strict';
 var Constants = require('./Constants');
 
@@ -11835,7 +12252,7 @@ ExecutionTree.prototype.getRelationFieldValues = function (relation, includeArra
 
 module.exports = ExecutionTree;
 
-},{"./Constants":33}],35:[function(require,module,exports){
+},{"./Constants":36}],38:[function(require,module,exports){
 'use strict';
 function ExpandError(message) {
     this.name = 'ExpandError';
@@ -11844,7 +12261,7 @@ function ExpandError(message) {
 }
 ExpandError.prototype = new Error;
 module.exports = ExpandError;
-},{}],36:[function(require,module,exports){
+},{}],39:[function(require,module,exports){
 'use strict';
 var async = require('async');
 var RelationTreeBuilder = require('./RelationTreeBuilder');
@@ -12148,7 +12565,7 @@ Processor.Constants = Constants;
 
 module.exports = Processor;
 
-},{"./Constants":33,"./ExecutionTree":34,"./ExpandError":35,"./RelationTreeBuilder":38,"async":39}],37:[function(require,module,exports){
+},{"./Constants":36,"./ExecutionTree":37,"./ExpandError":38,"./RelationTreeBuilder":41,"async":42}],40:[function(require,module,exports){
 'use strict';
 var Constants = require('./Constants');
 var _ = require('underscore');
@@ -12217,7 +12634,7 @@ RelationNode.prototype.isArray = function () {
 
 module.exports = RelationNode;
 
-},{"./Constants":33,"./ExpandError":35,"underscore":40}],38:[function(require,module,exports){
+},{"./Constants":36,"./ExpandError":38,"underscore":43}],41:[function(require,module,exports){
 'use strict';
 var RelationNode = require('./RelationNode');
 var _ = require('underscore');
@@ -12621,7 +13038,7 @@ RelationTreeBuilder.getIsFieldsExpressionExclusive = function (fieldsExpression)
 
 module.exports = RelationTreeBuilder;
 
-},{"./Constants":33,"./ExpandError":35,"./RelationNode":37,"async":39,"underscore":40}],39:[function(require,module,exports){
+},{"./Constants":36,"./ExpandError":38,"./RelationNode":40,"async":42,"underscore":43}],42:[function(require,module,exports){
 (function (process){
 /*!
  * async
@@ -13748,8 +14165,7 @@ module.exports = RelationTreeBuilder;
 }());
 
 }).call(this,require('_process'))
-
-},{"_process":5}],40:[function(require,module,exports){
+},{"_process":4}],43:[function(require,module,exports){
 //     Underscore.js 1.8.2
 //     http://underscorejs.org
 //     (c) 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -15287,624 +15703,82 @@ module.exports = RelationTreeBuilder;
   }
 }.call(this));
 
-},{}],41:[function(require,module,exports){
-var buildPromise = require('./utils').buildPromise;
+},{}],44:[function(require,module,exports){
 var EverliveError = require('./EverliveError').EverliveError;
-var Platform = require('./constants').Platform;
-var common = require('./common');
-var jstz = common.jstz;
-var _ = common._;
+var constants = require('./constants');
+var _ = require('underscore');
 
 module.exports = (function () {
-    /**
-     * @class CurrentDevice
-     * @deprecated
-     * @protected
-     * @param pushHandler
-     * @constructor
-     */
-    var CurrentDevice = function (pushHandler) {
-        this._pushHandler = pushHandler;
-        this._initSuccessCallback = null;
-        this._initErrorCallback = null;
 
-        //Suffix for the global callback functions
-        this._globalFunctionSuffix = null;
+    function AutoQueue(maxConcurrentTasks) {
+        maxConcurrentTasks = parseInt(maxConcurrentTasks || constants.MaxConcurrentDownloadTasks);
 
-        this.pushSettings = null;
-        this.pushToken = null;
-        this.isInitialized = false;
-        this.isInitializing = false;
+        if (isNaN(maxConcurrentTasks) || maxConcurrentTasks <= 0) {
+            throw new EverliveError('The maxConcurrentTasks must be a number larger than 0');
+        }
 
-        this.emulatorMode = false;
-    };
+        this.maxConcurrentTasks = maxConcurrentTasks;
+        this.runningTasksCount = 0;
+        this.tasks = [];
+    }
 
-    CurrentDevice.prototype = {
-
+    AutoQueue.prototype = {
         /**
-         * Initializes the current device for push notifications. This method requests a push token from the device vendor and enables the push notification functionality on the device. Once this is done, you can register the device in {{site.TelerikBackendServices}} using the register() method.
-         * @method enableNotifications
-         * @name enableNotifications
-         * @memberOf CurrentDevice.prototype
-         * @param {PushSettings} pushSettings An object specifying various settings for the initialization.
-         * @returns {Object} The promise for the request.
+         * @param {Function} task
+         * @param {Function} taskSuccess
+         * @param {Function} taskError
          */
-        /**
-         * Initializes the current device for push notifications. This method requests a push token from the device vendor and enables the push notification functionality on the device. Once this is done, you can register the device in Everlive using the register() method.
-         * @method enableNotifications
-         * @name enableNotifications
-         * @memberOf CurrentDevice.prototype
-         * @param {PushSettings} pushSettings An object specifying various settings for the initialization.
-         * @param {Function} [success] Callback to invoke on success.
-         * @param {Function} [error] Callback to invoke on error.
-         */
-        enableNotifications: function (pushSettings, success, error) {
-            this.pushSettings = this._cleanPlatformsPushSettings(pushSettings);
-
-            return buildPromise(_.bind(this._initialize, this), success, error);
-        },
-
-        /**
-         * Disables push notifications for the current device. This method invalidates any push tokens that were obtained for the device from the current application.
-         * @method disableNotifications
-         * @name disableNotifications
-         * @memberOf CurrentDevice.prototype
-         * @returns {Object} The promise for the request.
-         */
-        /**
-         * Disables push notifications for the current device. This method invalidates any push tokens that were obtained for the device from the current application.
-         * @method disableNotifications
-         * @name disableNotifications
-         * @memberOf CurrentDevice.prototype
-         * @param {Function} [success] Callback to invoke on success.
-         * @param {Function} [error] Callback to invoke on error.
-         */
-        disableNotifications: function (success, error) {
-            var self = this;
-
-            return this.unregister().then(
-                function () {
-                    return buildPromise(
-                        function (success, error) {
-                            if (self.emulatorMode) {
-                                success();
-                            } else {
-                                var pushNotification = window.plugins.pushNotification;
-                                var unregisterOptions;
-                                var platformType = self._getPlatformType(device.platform);
-                                if (platformType === Platform.WindowsPhone) {
-                                    unregisterOptions = {'channelName': self.pushSettings.wp8.channelName};
-                                }
-                                pushNotification.unregister(
-                                    function () {
-                                        self.isInitialized = false;
-                                        success();
-                                    },
-                                    error,
-                                    unregisterOptions
-                                );
-                            }
-                        },
-                        success,
-                        error
-                    );
-                },
-                error
-            );
-        },
-
-        /**
-         * Returns the push registration for the current device.
-         * @memberOf CurrentDevice.prototype
-         * @method getRegistration
-         * @name getRegistration
-         * @returns {Object} The promise for the request.
-         */
-        /**
-         * Returns the push registration for the current device.
-         * @memberOf CurrentDevice.prototype
-         * @method getRegistration
-         * @name getRegistration
-         * @param {Function} success Callback to invoke on success.
-         * @param {Function} error Callback to invoke on error.
-         */
-        getRegistration: function (success, error) {
-            var deviceId = encodeURIComponent(this._getDeviceId());
-            return this._pushHandler.devices.getById('HardwareId/' + deviceId, success, error);
-        },
-
-        /**
-         * Registers the current device for push notifications in {{site.TelerikBackendServices}}. This method can be called only after [enableNotifications()]{@link currentDevice.enableNotifications} has completed successfully.
-         * @memberOf CurrentDevice.prototype
-         * @method register
-         * @name register
-         * @param {Object} customParameters Custom parameters for the registration.
-         * @returns {Object} The promise for the request.
-         */
-        /**
-         * Registers the current device for push notifications in {{site.TelerikBackendServices}}. This method can be called only after [enableNotifications()]{@link currentDevice.enableNotifications} has completed successfully.
-         * @memberOf CurrentDevice.prototype
-         * @method register
-         * @name register
-         * @param {Object} customParameters Custom parameters for the registration.
-         * @param {Function} [success] Callback to invoke on success.
-         * @param {Function} [error] Callback to invoke on error.
-         */
-        register: function (customParameters, success, error) {
-            var self = this;
-
-            var deviceRegistration = {};
-            if (customParameters !== undefined) {
-                deviceRegistration.Parameters = customParameters;
+        enqueue: function (task, taskSuccess, taskError) {
+            if (!_.isFunction(taskSuccess) || !_.isFunction(taskError)) {
+                throw new EverliveError('taskSuccess and taskError functions must be provided');
             }
 
-            return this._populateRegistrationObject(deviceRegistration).then(
-                function () {
-                    return self._pushHandler.devices.create(deviceRegistration, success, error);
-                },
-                error
-            );
-        },
+            var args = [].splice.call(arguments, 3);
 
-        /**
-         * Unregisters the current device from push notifications in {{site.TelerikBackendServices}}. After this call completes successfully, {{site.bs}} will no longer send notifications to this device. Note that this does not prevent the device from receiving notifications and does not invalidate push tokens.
-         * @memberOf CurrentDevice.prototype
-         * @method unregister
-         * @name unregister
-         * @returns {Object} The promise for the request.
-         */
-        /**
-         * Unregisters the current device from push notifications in {{site.TelerikBackendServices}}. After this call completes successfully, {{site.bs}} will no longer send notifications to this device. Note that this does not prevent the device from receiving notifications and does not invalidate push tokens.
-         * @memberOf CurrentDevice.prototype
-         * @method unregister
-         * @name unregister
-         * @param {Function} [success] Callback to invoke on success.
-         * @param {Function} [error] Callback to invoke on error.
-         */
-        unregister: function (success, error) {
-            var deviceId = encodeURIComponent(device.uuid);
-            return this._pushHandler.devices.destroySingle({Id: 'HardwareId/' + deviceId}, success, error);
-        },
-
-        /**
-         * Updates the registration of the current device.
-         * @memberOf CurrentDevice.prototype
-         * @method updateRegistration
-         * @name updateRegistration
-         * @param {Object} customParameters Custom parameters for the registration. If undefined, customParameters are not updated.
-         * @returns {Object} The promise for the request.
-         */
-        /**
-         * Updates the registration for the current device.
-         * @memberOf CurrentDevice.prototype
-         * @method updateRegistration
-         * @name updateRegistration
-         * @param {Object} customParameters Custom parameters for the registration. If undefined, customParameters are not updated.
-         * @param {Function} [success] Callback to invoke on success.
-         * @param {Function} [error] Callback to invoke on error.
-         */
-        updateRegistration: function (customParameters, success, error) {
-            var self = this;
-
-            var deviceRegistration = {};
-            if (customParameters !== undefined) {
-                deviceRegistration.Parameters = customParameters;
-            }
-
-            return this._populateRegistrationObject(deviceRegistration).then(
-                function () {
-                    deviceRegistration.Id = 'HardwareId/' + encodeURIComponent(deviceRegistration.HardwareId);
-                    return self._pushHandler.devices.updateSingle(deviceRegistration, success, error);
-                },
-                error
-            );
-        },
-
-        _initializeInteractivePush: function (iOSSettings, success, error) {
-            var pushPlugin = window.plugins.pushNotification;
-
-            var interactiveSettings = iOSSettings.interactiveSettings;
-            var notificationTypes = [];
-            if (iOSSettings.alert) {
-                notificationTypes.push(pushPlugin.UserNotificationTypes.Alert);
-            }
-            if (iOSSettings.badge) {
-                notificationTypes.push(pushPlugin.UserNotificationTypes.Badge);
-            }
-            if (iOSSettings.sound) {
-                notificationTypes.push(pushPlugin.UserNotificationTypes.Sound);
-            }
-
-            var getAction = function (actionIdentifier) {
-                var action = _.find(interactiveSettings.actions, function (action) {
-                    return action.identifier === actionIdentifier;
-                });
-
-                return action;
-            };
-            var categories = _.map(interactiveSettings.categories, function (category) {
-                return {
-                    identifier: category.identifier,
-                    actionsForDefaultContext: _.map(category.actionsForDefaultContext, getAction),
-                    actionsForMinimalContext: _.map(category.actionsForMinimalContext, getAction)
-                }
+            this.tasks.push({
+                task: task,
+                args: args,
+                success: taskSuccess,
+                error: taskError
             });
 
-            pushPlugin.registerUserNotificationSettings(
-                // the success callback which will immediately return (APNs is not contacted for this)
-                success,
-                // called in case the configuration is incorrect
-                error, {
-                    // asking permission for these features
-                    types: notificationTypes,
-                    // register these categories
-                    categories: categories
-                }
-            );
+            this._runNext();
         },
 
-        //Initializes the push functionality on the device.
-        _initialize: function (success, error) {
+        _runNext: function () {
             var self = this;
 
-            if (this.isInitializing) {
-                error(new EverliveError('Push notifications are currently initializing.'));
+            if (self.runningTasksCount === self.maxConcurrentTasks || !self.tasks.length) {
                 return;
             }
 
-            if (!this.emulatorMode && (!window.navigator || !window.navigator.globalization)) {
-                error(new EverliveError('The globalization plugin is not initialized.'));
-                return;
-            }
+            self.runningTasksCount++;
 
-            if (!this.emulatorMode && (!window.plugins || !window.plugins.pushNotification)) {
-                error(new EverliveError('The push notifications plugin is not initialized.'));
-                return;
-            }
+            var nextTask = this.tasks.shift();
+            var task = nextTask.task;
+            var args = nextTask.args;
+            var taskSuccess = nextTask.success;
+            var taskError = nextTask.error;
 
-            this._initSuccessCallback = success;
-            this._initErrorCallback = error;
+            args.unshift(function executedCallback(err) {
+                self.runningTasksCount--;
 
-            if (this.isInitialized) {
-                this._deviceRegistrationSuccess(this.pushToken);
-                return;
-            }
-
-            if (this.emulatorMode) {
-                setTimeout(
-                    function () {
-                        self._deviceRegistrationSuccess('fake_push_token');
-                    },
-                    1000
-                );
-                return;
-            }
-
-            this.isInitializing = true;
-
-            var suffix = this._globalFunctionSuffix;
-            if (!suffix) {
-                suffix = Date.now().toString();
-                this._globalFunctionSuffix = suffix;
-            }
-
-            var pushNotification = window.plugins.pushNotification;
-
-            var platformType = this._getPlatformType(device.platform);
-            if (platformType === Platform.iOS) {
-                //Initialize global APN callback
-                var apnCallbackName = 'apnCallback_' + suffix;
-                Everlive.PushCallbacks[apnCallbackName] = _.bind(this._onNotificationAPN, this);
-
-                //Construct registration options object and validate iOS settings
-                var apnRegistrationOptions = this.pushSettings.iOS;
-                this._validateIOSSettings(apnRegistrationOptions);
-                apnRegistrationOptions.ecb = 'Everlive.PushCallbacks.' + apnCallbackName;
-
-                //Register for APN
-                pushNotification.register(
-                    _.bind(this._successfulRegistrationAPN, this),
-                    _.bind(this._failedRegistrationAPN, this),
-                    apnRegistrationOptions
-                );
-            } else if (platformType === Platform.Android) {
-                //Initialize global GCM callback
-                var gcmCallbackName = 'gcmCallback_' + suffix;
-                Everlive.PushCallbacks[gcmCallbackName] = _.bind(this._onNotificationGCM, this);
-
-                //Construct registration options object and validate the Android settings
-                var gcmRegistrationOptions = this.pushSettings.android;
-                this._validateAndroidSettings(gcmRegistrationOptions);
-                gcmRegistrationOptions.ecb = 'Everlive.PushCallbacks.' + gcmCallbackName;
-
-                //Register for GCM
-                pushNotification.register(
-                    _.bind(this._successSentRegistrationGCM, this),
-                    _.bind(this._errorSentRegistrationGCM, this),
-                    gcmRegistrationOptions
-                );
-            } else if (platformType === Platform.WindowsPhone) {
-                //Initialize global WP8 callbacks.
-                var wp8CallbackName = 'wp8Callback_' + suffix;
-                var wp8RegistrationSuccessCallbackName = 'wp8RegistrationSuccessCallback_' + suffix;
-                var wp8RegistrationErrorCallbackName = 'wp8RegistrationErrorCallback_' + suffix;
-
-                Everlive.PushCallbacks[wp8CallbackName] = _.bind(this._onNotificationWP8, this);
-                Everlive.PushCallbacks[wp8RegistrationSuccessCallbackName] = _.bind(this._deviceRegistrationSuccessWP, this);
-                Everlive.PushCallbacks[wp8RegistrationErrorCallbackName] = _.bind(this._deviceRegistrationFailed, this);
-
-                //Construct registration options object and validate the WP8  settings
-                var wp8RegistrationOptions = this.pushSettings.wp8;
-                this._validateWP8Settings(wp8RegistrationOptions);
-                wp8RegistrationOptions.ecb = 'Everlive.PushCallbacks.' + wp8CallbackName;
-                wp8RegistrationOptions.uccb = 'Everlive.PushCallbacks.' + wp8RegistrationSuccessCallbackName;
-                wp8RegistrationOptions.errcb = 'Everlive.PushCallbacks.' + wp8RegistrationErrorCallbackName;
-
-
-                pushNotification.register(
-                    _.bind(this._successSentRegistrationWP8, this),
-                    _.bind(this._errorSentRegistrationWP8, this),
-                    wp8RegistrationOptions
-                );
-
-            } else {
-                throw new EverliveError('The current platform is not supported: ' + device.platform);
-            }
-        },
-
-        _deviceRegistrationSuccessWP: function (result) {
-            this._deviceRegistrationSuccess(result.uri);
-        },
-
-        _validateAndroidSettings: function (androidSettings) {
-            if (!androidSettings.senderID) {
-                throw new EverliveError('Sender ID (project number) is not set in the android settings.');
-            }
-        },
-        _validateWP8Settings: function (settings) {
-            if (!settings.channelName) {
-                throw new EverliveError('channelName is not set in the WP8 settings.');
-            }
-        },
-
-        _validateIOSSettings: function (iOSSettings) {
-
-        },
-
-        _cleanPlatformsPushSettings: function (pushSettings) {
-            var cleanSettings = {};
-            pushSettings = pushSettings || {};
-
-            var addSettingsForPlatform = function addSettingsForPlatform(newSettingsObject, platform, allowedFields) {
-                if (!pushSettings[platform]) {
-                    return;
+                if (err) {
+                    taskError(err);
+                } else {
+                    taskSuccess.apply(null, [].splice.call(arguments, 1));
                 }
 
-                newSettingsObject[platform] = newSettingsObject[platform] || {};
-                var newPlatformSettings = pushSettings[platform];
-                var settings = newSettingsObject[platform];
-                _.each(allowedFields, function (allowedField) {
-                    if (newPlatformSettings.hasOwnProperty(allowedField)) {
-                        settings[allowedField] = newPlatformSettings[allowedField];
-                    }
-                });
-            };
-
-            addSettingsForPlatform(cleanSettings, 'iOS', ['badge', 'sound', 'alert', 'interactiveSettings']);
-            addSettingsForPlatform(cleanSettings, 'android', ['senderID', 'projectNumber']);
-            addSettingsForPlatform(cleanSettings, 'wp8', ['channelName']);
-
-            var callbackFields = ['notificationCallbackAndroid', 'notificationCallbackIOS', 'notificationCallbackWP8'];
-            _.each(callbackFields, function (callbackField) {
-                var callback = pushSettings[callbackField];
-                if (callback) {
-                    if (typeof callback !== 'function') {
-                        throw new EverliveError('The "' + callbackField + '" of the push settings should be a function');
-                    }
-
-                    cleanSettings[callbackField] = pushSettings[callbackField];
-                }
+                self._runNext();
             });
 
-            if (pushSettings.customParameters) {
-                cleanSettings.customParameters = pushSettings.customParameters;
-            }
-
-            return cleanSettings;
-        },
-
-        _populateRegistrationObject: function (deviceRegistration, success, error) {
-            var self = this;
-
-            return buildPromise(
-                function (success, error) {
-                    if (!self.pushToken) {
-                        throw new EverliveError('Push token is not available.');
-                    }
-
-                    self._getLocaleName(
-                        function (locale) {
-                            var deviceId = self._getDeviceId();
-                            var hardwareModel = device.model;
-                            var platformType = self._getPlatformType(device.platform);
-                            var timeZone = jstz.determine().name();
-                            var pushToken = self.pushToken;
-                            var language = locale.value;
-                            var platformVersion = device.version;
-
-                            deviceRegistration.HardwareId = deviceId;
-                            deviceRegistration.HardwareModel = hardwareModel;
-                            deviceRegistration.PlatformType = platformType;
-                            deviceRegistration.PlatformVersion = platformVersion;
-                            deviceRegistration.TimeZone = timeZone;
-                            deviceRegistration.PushToken = pushToken;
-                            deviceRegistration.Locale = language;
-
-                            success();
-                        },
-                        error
-                    );
-                },
-                success,
-                error
-            );
-        },
-
-        _getLocaleName: function (success, error) {
-            if (this.emulatorMode) {
-                success({value: 'en_US'});
-            } else {
-                navigator.globalization.getLocaleName(
-                    function (locale) {
-                        success(locale);
-                    },
-                    error
-                );
-                navigator.globalization.getLocaleName(
-                    function (locale) {
-                    },
-                    error
-                );
-            }
-        },
-
-        _getDeviceId: function () {
-            return device.uuid;
-        },
-
-        //Returns the Everlive device platform constant given a value aquired from cordova's device.platform.
-        _getPlatformType: function (platformString) {
-            var psLower = platformString.toLowerCase();
-            switch (psLower) {
-                case 'ios':
-                case 'iphone':
-                case 'ipad':
-                    return Platform.iOS;
-                case 'android':
-                    return Platform.Android;
-                case 'wince':
-                    return Platform.WindowsPhone;
-                case 'win32nt': // real wp8 devices return this string as platform identifier.
-                    return Platform.WindowsPhone;
-                default:
-                    return Platform.Unknown;
-            }
-        },
-
-        _deviceRegistrationFailed: function (error) {
-            this.pushToken = null;
-            this.isInitializing = false;
-            this.isInitialized = false;
-
-            if (this._initErrorCallback) {
-                this._initErrorCallback({error: error});
-            }
-        },
-
-        _deviceRegistrationSuccess: function (token) {
-            this.pushToken = token;
-            this.isInitializing = false;
-            this.isInitialized = true;
-
-            if (this._initSuccessCallback) {
-                this._initSuccessCallback({token: token});
-            }
-        },
-
-        //Occurs when the device registration in APN succeeds
-        _successfulRegistrationAPN: function (token) {
-            var self = this;
-            if (this.pushSettings.iOS && this.pushSettings.iOS.interactiveSettings) {
-                this._initializeInteractivePush(
-                    this.pushSettings.iOS,
-                    function () {
-                        self._deviceRegistrationSuccess(token);
-                    },
-                    function (err) {
-                        throw new EverliveError('The interactive push configuration is incorrect: ' + err);
-                    }
-                );
-            } else {
-                this._deviceRegistrationSuccess(token);
-            }
-        },
-
-        //Occurs if the device registration in APN fails
-        _failedRegistrationAPN: function (error) {
-            this._deviceRegistrationFailed(error);
-        },
-
-        //Occurs when device registration has been successfully sent to GCM
-        _successSentRegistrationGCM: function (id) {
-            //console.log("Successfully sent request for registering with GCM.");
-        },
-        //Occurs when device registration has been successfully sent for WP8
-        _successSentRegistrationWP8: function (id) {
-            //console.log("Successfully sent request for registering WP8 .");
-        },
-        //Occurs when an error occured when sending registration request for WP8
-        _errorSentRegistrationWP8: function (error) {
-            this._deviceRegistrationFailed(error);
-        },
-
-        //Occurs when an error occured when sending registration request to GCM
-        _errorSentRegistrationGCM: function (error) {
-            this._deviceRegistrationFailed(error);
-        },
-
-        //This function receives all notification events from APN
-        _onNotificationAPN: function (e) {
-            this._raiseNotificationEventIOS(e);
-        },
-        //This function receives all notification events for WP8
-        _onNotificationWP8: function (e) {
-            this._raiseNotificationEventWP8(e);
-        },
-
-        //This function receives all notification events from GCM
-        _onNotificationGCM: function onNotificationGCM(e) {
-            switch (e.event) {
-                case 'registered':
-                    if (e.regid.length > 0) {
-                        this._deviceRegistrationSuccess(e.regid);
-                    }
-                    break;
-                case 'message':
-                    this._raiseNotificationEventAndroid(e);
-                    break;
-                case 'error':
-                    if (!this.pushToken) {
-                        this._deviceRegistrationFailed(e);
-                    } else {
-                        this._raiseNotificationEventAndroid(e);
-                    }
-                    break;
-                default:
-                    this._raiseNotificationEventAndroid(e);
-                    break;
-            }
-        },
-
-        _raiseNotificationEventAndroid: function (e) {
-            if (this.pushSettings.notificationCallbackAndroid) {
-                this.pushSettings.notificationCallbackAndroid(e);
-            }
-        },
-        _raiseNotificationEventIOS: function (e) {
-            if (this.pushSettings.notificationCallbackIOS) {
-                this.pushSettings.notificationCallbackIOS(e);
-            }
-        },
-        _raiseNotificationEventWP8: function (e) {
-            if (this.pushSettings.notificationCallbackWP8) {
-                this.pushSettings.notificationCallbackWP8(e);
-            }
+            task.apply(null, args);
         }
     };
 
-    return CurrentDevice;
+    return AutoQueue;
 }());
-},{"./EverliveError":44,"./common":53,"./constants":54,"./utils":87}],42:[function(require,module,exports){
+},{"./EverliveError":47,"./constants":59,"underscore":35}],45:[function(require,module,exports){
 'use strict';
 
 var EventEmitter = require('events').EventEmitter;
@@ -15940,7 +15814,7 @@ var apply = function apply(obj) {
 module.exports = {
     apply: apply
 };
-},{"events":2}],43:[function(require,module,exports){
+},{"events":1}],46:[function(require,module,exports){
 var Setup = require('./Setup');
 var Data = require('./types/Data');
 var usersModule = require('./types/Users');
@@ -15951,6 +15825,7 @@ var buildAuthHeader = utils.buildAuthHeader;
 var Push = require('./Push');
 var Authentication = require('./auth/Authentication');
 var offlineModule = require('./offline/offline');
+var caching = require('./caching/caching');
 var Request = require('./Request');
 var common = require('./common');
 var rsvp = common.rsvp;
@@ -15959,6 +15834,9 @@ var EverliveError = require('./EverliveError').EverliveError;
 var EverliveErrors = require('./EverliveError').EverliveErrors;
 var helpers = require('./helpers/helpers');
 var EventEmitterProxy = require('./EventEmitterProxy');
+
+// Registering mixins:
+var mixins = require('./mixins/mixins');
 
 module.exports = (function () {
 
@@ -15976,15 +15854,34 @@ module.exports = (function () {
      * @param {string} [options.scheme=http] - The URI scheme used to make requests. Supported values: http, https
      * @param {boolean} [options.parseOnlyCompleteDateTimeObjects=false] - If set to true, the SDK will parse only complete date strings (according to the ISO 8601 standard).
      * @param {boolean} [options.emulatorMode=false] - Set this option to true to set the SDK in emulator mode.
-     * @param {object|boolean} [options.offlineStorage] - Set this option to true to use the default offline settings.
-     * @param {boolean} [options.offlineStorage.isOnline=true] - Whether the storage is in online mode initially.
-     * @param {ConflictResolutionStrategy|function} [options.offlineStorage.conflicts.strategy=ConflictResolutionStrategy.ClientWins] - A constant specifying the conflict resolution strategy or a function used to resolve the conflicts.
-     * @param {StorageProvider|object} [options.offlineStorage.storage.provider=StorageProvider.LocalStorage] - An object specifying settings for the offline storage provider.
-     * @param {string} [options.offlineStorage.storage.storagePath=el_store] - A relative path specifying where the files will be saved if file system is used for persistence.
-     * @param {number} [options.offlineStorage.storage.requestedQuota=10485760] - How much memory (in bytes) to be requested when using the file system for persistence. This option is only valid for Chrome as the other platforms use all the available space.
-     * @param {string} [options.offlineStorage.encryption.key] - A key that will be used to encrypt the data stored offline.
+     * @param {object|boolean} [options.offline] - Set this option to true to use the default offline settings.
+	 * @param {boolean} [options.offline.enabled=false] - When using an object to initialize Offline Support with non-default settings, set this option to enable or disable Offline Support.
+     * @param {boolean} [options.offline.isOnline=true] - Whether the storage is in online mode initially.
+     * @param {ConflictResolutionStrategy|function} [options.offline.conflicts.strategy=ConflictResolutionStrategy.ClientWins] - A constant specifying the conflict resolution strategy or a function used to resolve the conflicts.
+     * @param {StorageProvider|object} [options.offline.storage.provider=StorageProvider.LocalStorage] - An object specifying settings for the offline storage provider.
+     * @param {string} [options.offline.storage.storagePath=el_store] - A relative path specifying where the files will be saved if file system is used for persistence for item metadata.
+     * @param {number} [options.offline.storage.requestedQuota=10485760] - How much memory (in bytes) to be requested when using the file system for persistence. This option is only valid for Chrome as the other platforms use all the available space.
+     * @param {string} [options.offline.encryption.key] - A key that will be used to encrypt the data stored offline.
+     * @param {string} [options.offline.files.storagePath=el_file_store] - A relative path specifying where the files will be saved if file system is used for persistence of files in offline mode.
+     * @param {string} [options.offline.files.metaPath=el_file_mapping] - A relative path specifying where the metadata file will be saved if file system is used for persistence of files in offline mode.
+     * @param {object|boolean} [options.offline.files] - Set this option to true to enable support for files in offline mode.
+     * @param {number} [options.offline.files.maxConcurrentDownloads] - The maximum amount of files that can be downloaded simultaneously.
      * @param {boolean} [options.authentication.persist=false] - Indicates whether the current user's authentication will be persisted.
      * @param {Function} [options.authentication.onAuthenticationRequired] - Invoked when the user's credentials have expired. Allowing you to perform custom logic.
+     * @param {object} [options.helpers] - An object holding options for all Everlive helper components.
+     * @param {object} [options.helpers.html] - HTML Helper configuration objects.
+     * @param {boolean} [options.helpers.html.processOnLoad=false] - Whether to process all HTML elements when the window loads.
+     * @param {boolean} [options.helpers.html.processOnResize=false] - Whether to process all HTML elements when the window resizes.
+     * @param {string} [options.helpers.html.loadingImageUrl] - The image to be displayed while the original image is being processed.
+     * @param {string} [options.helpers.html.errorImageUrl] - The image to be displayed when the original image processing fails.
+     * @param {object} [options.helpers.html.attributes] - HTML Helper attributes configuration object.
+     * @param {object} [options.helpers.html.attributes.loadingImage=data-loading-image] - A custom name for the attribute to be used to set a loading image.
+     * @param {object} [options.helpers.html.attributes.errorImage=data-error-image] - A custom name for the attribute to be used to set an error image.
+     * @param {object} [options.helpers.html.attributes.dpi=data-dpi] - A custom name for the attribute to be used to specify DPI settings.
+     * @param {object} [options.helpers.html.attributes.imageSource=data-src] - A custom name for the attribute to be used to set the image source.
+     * @param {object} [options.helpers.html.attributes.fileSource=data-href] - A custom name for the attribute to be used to set the anchor source.
+     * @param {object} [options.helpers.html.attributes.enableOffline=data-offline] - A custom name for the attribute to be used to control offline processing.
+     * @param {object} [options.helpers.html.attributes.enableResponsive=data-responsive] - A custom name for the attribute to be used to control Responsive Images processing.
      */
     function Everlive(options) {
         var self = this;
@@ -16183,7 +16080,8 @@ module.exports = (function () {
     }
 
     Everlive.prototype._isOfflineStorageEnabled = function () {
-        return !!this.setup.offlineStorage;
+        var offlineStorageOptions = this.setup.offlineStorage || this.setup.offline;
+        return offlineStorageOptions && offlineStorageOptions.enabled !== false;
     };
 
     /**
@@ -16240,7 +16138,6 @@ module.exports = (function () {
      * @returns {boolean} Returns true if the SDK is in online mode.
      */
     Everlive.prototype.isOnline = function () {
-        protectOfflineEnabled.call(this);
         return this.offlineStorage.isOnline();
     };
 
@@ -16317,27 +16214,26 @@ module.exports = (function () {
     };
 
     var initializeHelpers = function initializeHelpers(options) {
-        if (!_.size(options.helpers)) {
-            return;
-        }
-
         var self = this;
         self.helpers = {};
+
         _.each(helpers, function (helper) {
-            self.helpers[helper.name] = new helper.ctor(self, options.helpers[helper.name]);
+            var helperOptions = options.helpers ? options.helpers[helper.name] : null;
+            self.helpers[helper.name] = new helper.ctor(self, helperOptions);
         });
     };
 
+    initializations.push({name: 'caching', func: caching.initCaching});
     initializations.push({name: 'offlineStorage', func: offlineModule.initOfflineStorage});
+    initializations.push({name: 'cacheStore', func: caching._initStore});
     initializations.push({name: 'default', func: initDefault});
     initializations.push({name: 'authentication', func: initAuthentication});
     initializations.push({name: 'helpers', func: initializeHelpers});
 
-
     return Everlive;
 }());
 
-},{"./EventEmitterProxy":42,"./EverliveError":44,"./Push":48,"./Request":49,"./Setup":50,"./auth/Authentication":51,"./common":53,"./constants":54,"./helpers/helpers":57,"./offline/offline":67,"./types/Data":84,"./types/Files":85,"./types/Users":86,"./utils":87}],44:[function(require,module,exports){
+},{"./EventEmitterProxy":45,"./EverliveError":47,"./Push":51,"./Request":52,"./Setup":53,"./auth/Authentication":54,"./caching/caching":57,"./common":58,"./constants":59,"./helpers/helpers":62,"./mixins/mixins":68,"./offline/offline":76,"./types/Data":96,"./types/Files":97,"./types/Users":98,"./utils":99}],47:[function(require,module,exports){
 var EverliveErrors = {
     itemNotFound: {
         code: 801,
@@ -16353,23 +16249,26 @@ var EverliveErrors = {
     },
     syncInProgress: {
         code: 10003,
-        message: 'Cannot perform operation while synchronization is in progress'
+        message: 'Cannot perform operation while synchronization is in progress.'
     },
     syncCancelledByUser: {
         code: 10004,
-        message: 'Synchronization cancelled by user'
+        message: 'Synchronization cancelled by user.'
+    },
+    operationNotSupportedOffline: {
+        code: 20000 // the error message is created dynamically based on the query filter for offline storage
     },
     generalDatabaseError: {
         code: 107,
-        message: 'General database error'
+        message: 'General database error.'
     },
     invalidToken: {
         code: 301,
-        message: 'Invalid access token'
+        message: 'Invalid access token.'
     },
     expiredToken: {
         code: 302,
-        message: 'Expired access token'
+        message: 'Expired access token.'
     },
     invalidExpandExpression: {
         code: 618,
@@ -16389,17 +16288,27 @@ var EverliveErrors = {
     },
     customFileSyncNotSupported: {
         code: 703,
-        message: 'Custom ConflictResolution for files is not allowed'
+        message: 'Custom ConflictResolution for files is not allowed.'
     },
     cannotDownloadOffline: {
         code: 704,
-        message: 'Cannot download a file while offline'
+        message: 'Cannot download a file while offline.'
+    },
+    cannotForceCacheWhenDisabled: {
+        code: 705,
+        message: 'Cannot use forceCache while the caching is disabled.'
     }
 };
 
 var EverliveError = (function () {
     function EverliveError(message, code) {
         var tmpError = Error.apply(this);
+
+        if (typeof message === 'object') {
+            var err = message;
+            message = err.message;
+            code = err.code;
+        }
 
         tmpError.message = message;
         tmpError.code = code || 0;
@@ -16474,18 +16383,21 @@ module.exports = {
     EverliveErrors: EverliveErrors,
     DeviceRegistrationError: DeviceRegistrationError
 };
-},{}],45:[function(require,module,exports){
+},{}],48:[function(require,module,exports){
 var Processor = require('./common').Processor;
 var DataQuery = require('./query/DataQuery');
 var Query = require('./query/Query');
 var EverliveError = require('./EverliveError').EverliveError;
+var constants = require('./constants');
 
 module.exports = (function () {
     return new Processor({
         executionNodeFunction: function (node, expandContext, done) {
+            var targetTypeName = node.targetTypeName.toLowerCase() === constants.FilesTypeNameLegacy ? constants.FilesTypeName : node.targetTypeName;
+
             var query = new DataQuery({
                 operation: DataQuery.operations.read,
-                collectionName: node.targetTypeName,
+                collectionName: targetTypeName,
                 filter: new Query(node.filter, node.select, node.sort, node.skip, node.take)
             });
 
@@ -16496,7 +16408,7 @@ module.exports = (function () {
     });
 }());
 
-},{"./EverliveError":44,"./common":53,"./query/DataQuery":73,"./query/Query":74}],46:[function(require,module,exports){
+},{"./EverliveError":47,"./common":58,"./constants":59,"./query/DataQuery":85,"./query/Query":86}],49:[function(require,module,exports){
 module.exports = (function () {
     function Expression(operator, operands) {
         this.operator = operator;
@@ -16511,7 +16423,7 @@ module.exports = (function () {
 
     return Expression;
 }());
-},{}],47:[function(require,module,exports){
+},{}],50:[function(require,module,exports){
 module.exports = (function () {
     //TODO add a function for calculating the distances in geospatial queries
 
@@ -16528,14 +16440,14 @@ module.exports = (function () {
 
     return GeoPoint;
 }());
-},{}],48:[function(require,module,exports){
+},{}],51:[function(require,module,exports){
 var utils = require('./utils');
 var buildPromise = utils.buildPromise;
 var DeviceRegistrationResult = utils.DeviceRegistrationResult;
 var everliveErrorModule = require('./EverliveError');
 var DeviceRegistrationError = everliveErrorModule.DeviceRegistrationError;
 var EverliveError = everliveErrorModule.EverliveError;
-var CurrentDevice = require('./CurrentDevice');
+var CurrentDevice = require('./push/CurrentDevice');
 var Platform = require('./constants').Platform;
 
 module.exports = (function () {
@@ -16559,12 +16471,7 @@ module.exports = (function () {
          * @memberOf Push.prototype
          */
         ensurePushIsAvailable: function () {
-            var isPushNotificationPluginAvailable = (typeof window !== 'undefined' && window.plugins && window.plugins.pushNotification);
-
-            if (!isPushNotificationPluginAvailable) {
-                throw new EverliveError("The push notification plugin is not available. Ensure that the pushNotification plugin is included " +
-                "and use after `deviceready` event has been fired.");
-            }
+            CurrentDevice.ensurePushIsAvailable();            
         },
         /**
          * Returns the current device for sending push notifications
@@ -16581,17 +16488,15 @@ module.exports = (function () {
 
             if (arguments.length === 0) {
                 emulatorMode = this._el.setup._emulatorMode;
-            }
-
-            if (!window.cordova) {
-                throw new EverliveError('Error: currentDevice() can only be called from within a hybrid mobile app, after \'deviceready\' event has been fired.');
-            }
+            }            
 
             if (!this._currentDevice) {
                 this._currentDevice = new CurrentDevice(this);
             }
 
-            this._currentDevice.emulatorMode = emulatorMode;
+            var inAppBuilderSimulator = typeof window !== undefined && window.navigator && window.navigator.simulator;
+
+            this._currentDevice.emulatorMode = emulatorMode || inAppBuilderSimulator;
 
             return this._currentDevice;
         },
@@ -16665,7 +16570,7 @@ module.exports = (function () {
             };
 
             var clearBadgeIfNeeded = function (token, successCb, errorCb) {
-                var platformType = currentDevice._getPlatformType(device.platform);
+                var platformType = currentDevice._getPlatformType();
                 var clearBadge = platformType === Platform.iOS;
 
                 if (clearBadge && settings.iOS) {
@@ -16894,18 +16799,14 @@ module.exports = (function () {
         areNotificationsEnabled: function (options, onSuccess, onError) {
             this.ensurePushIsAvailable();
 
-            options = options || {};
-            var pushNotification = window.plugins.pushNotification;
-
-            return buildPromise(function (successCb, errorCb) {
-                pushNotification.areNotificationsEnabled(successCb, errorCb, options);
-            }, onSuccess, onError);
+            var currentDevice = this.currentDevice();
+            return currentDevice.areNotificationsEnabled(options, onSuccess, onError);
         }
     };
 
     return Push;
 }());
-},{"./CurrentDevice":41,"./EverliveError":44,"./constants":54,"./utils":87}],49:[function(require,module,exports){
+},{"./EverliveError":47,"./constants":59,"./push/CurrentDevice":83,"./utils":99}],52:[function(require,module,exports){
 var utils = require('./utils');
 var rsvp = require('./common').rsvp;
 var buildAuthHeader = utils.buildAuthHeader;
@@ -17067,7 +16968,7 @@ module.exports = (function () {
 
     return Request;
 }());
-},{"./common":53,"./constants":54,"./everlive.platform":56,"./query/Query":74,"./utils":87}],50:[function(require,module,exports){
+},{"./common":58,"./constants":59,"./everlive.platform":61,"./query/Query":86,"./utils":99}],53:[function(require,module,exports){
 var _ = require('./common')._;
 var constants = require('./constants');
 var AuthenticationSetup = require('./auth/AuthenticationSetup');
@@ -17112,7 +17013,7 @@ module.exports = (function () {
     return Setup;
 
 }());
-},{"./auth/AuthenticationSetup":52,"./common":53,"./constants":54}],51:[function(require,module,exports){
+},{"./auth/AuthenticationSetup":55,"./common":58,"./constants":59}],54:[function(require,module,exports){
 'use strict';
 var utils = require('../utils');
 var DataQuery = require('../query/DataQuery');
@@ -17554,7 +17455,7 @@ module.exports = (function () {
     return Authentication;
 }());
 
-},{"../Everlive":43,"../EverliveError":44,"../Request":49,"../constants":54,"../query/DataQuery":73,"../storages/LocalStore":81,"../utils":87}],52:[function(require,module,exports){
+},{"../Everlive":46,"../EverliveError":47,"../Request":52,"../constants":59,"../query/DataQuery":85,"../storages/LocalStore":93,"../utils":99}],55:[function(require,module,exports){
 'use strict';
 module.exports = (function () {
     var AuthenticationSetup = function (everlive, options) {
@@ -17565,7 +17466,326 @@ module.exports = (function () {
 
     return AuthenticationSetup;
 }());
-},{}],53:[function(require,module,exports){
+},{}],56:[function(require,module,exports){
+'use strict';
+
+var constants = require('../constants');
+var common = require('../common');
+var utils = require('../utils');
+var buildPromise = utils.buildPromise;
+var jsonStringify = common.jsonStringify;
+var rsvp = common.rsvp;
+var _ = require('underscore');
+
+var persisters = require('../offline/offlinePersisters');
+var EverliveError = require('../EverliveError').EverliveError;
+var Query = require('../query/Query');
+var DataQuery = require('../query/DataQuery');
+var buildOfflineStorageOptions = require('../offline/offline').buildOfflineStorageOptions;
+
+var CacheModule = function (options, everlive) {
+    this.options = options;
+    this.typeSettings = this.options.typeSettings;
+    this.maxAgeInMs = this.options.maxAge * 60 * 1000;
+    this._everlive = everlive;
+};
+
+var cacheableOperations = [
+    DataQuery.operations.read,
+    DataQuery.operations.readById,
+    DataQuery.operations.count
+];
+
+CacheModule.prototype = {
+    _hash: function (obj) {
+        return jsonStringify(obj);
+    },
+
+    // using the offline storage options to initialize the same type of storage
+    _initStore: function (sdkOptions) {
+        if (!this.persister) {
+            var offlineStorageOptions = buildOfflineStorageOptions(sdkOptions);
+            var storageKey = this.options.storage.storagePath;
+
+            this.persister = persisters.getPersister(storageKey, offlineStorageOptions);
+        }
+    },
+
+    _getCacheData: function () {
+        var self = this;
+
+        if (!this.cacheData) {
+            return this._persisterGetAllDataWrap()
+                .then(function (cacheData) {
+                    self.cacheData = cacheData;
+                    return self.cacheData;
+                });
+        }
+
+        return utils.successfulPromise(this.cacheData);
+    },
+
+    _persisterGetAllDataWrap: function () {
+        var self = this;
+
+        return new rsvp.Promise(function (resolve, reject) {
+            return self.persister.getAllData(resolve, reject);
+        });
+    },
+
+    _persisterSaveDataWrap: function (contentType, data) {
+        var self = this;
+        return new rsvp.Promise(function (resolve, reject) {
+            return self.persister.saveData(contentType, JSON.stringify(data), resolve, reject);
+        });
+    },
+
+    _getCacheDataForContentType: function (contentType) {
+        return this._getCacheData()
+            .then(function (cacheData) {
+                if (typeof cacheData[contentType] === 'string') {
+                    cacheData[contentType] = JSON.parse(cacheData[contentType]);
+                } else {
+                    cacheData[contentType] = cacheData[contentType] || {};
+                }
+
+                return _.clone(cacheData[contentType]);
+            })
+    },
+
+    _persistCacheData: function (contentType, cacheData) {
+        var self = this;
+
+        return this._getCacheDataForContentType(contentType)
+            .then(function () {
+                var dataToCache = _.extend({}, self.cacheData[contentType], cacheData);
+                self.cacheData[contentType] = _.compactObject(dataToCache);
+                return self._persisterSaveDataWrap(contentType, self.cacheData[contentType]);
+            });
+    },
+
+    isQueryUnsupportedOffline: function (dataQuery) {
+        var hasPowerfieldsExpression = !!dataQuery.getHeader(constants.Headers.powerFields);
+        var queryParams = dataQuery.getQueryParameters();
+        var dataQueryFilter = queryParams.filter;
+        var unsupportedDbOperators = utils.getUnsupportedOperators(dataQueryFilter);
+        var hasUnsupportedOperators = unsupportedDbOperators.length !== 0;
+        return hasPowerfieldsExpression || hasUnsupportedOperators;
+    },
+
+    _shouldSkipCache: function (dataQuery) {
+        var operationShouldSkipCache = cacheableOperations.indexOf(dataQuery.operation) === -1;
+        var collectionName = dataQuery.collectionName;
+        var typeSettings = this.typeSettings;
+        var cacheDisabledForContentType = typeSettings && typeSettings && typeSettings[collectionName] && typeSettings[collectionName].enabled === false;
+        var ignoreCacheForQuery = dataQuery.ignoreCache;
+
+        var isUnsupportedOffline = this.isQueryUnsupportedOffline(dataQuery);
+
+        return operationShouldSkipCache || cacheDisabledForContentType || ignoreCacheForQuery || isUnsupportedOffline;
+    },
+
+    _cacheDataQuery: function (dataQuery) {
+        if (this._shouldSkipCache(dataQuery)) {
+            if (dataQuery.ignoreCache && !this.isQueryUnsupportedOffline(dataQuery)) {
+                var hash = this._getHashForQuery(dataQuery);
+                this._cacheQuery(dataQuery, hash);
+            } else {
+                this._everlive.data(dataQuery.collectionName)._sendRequest(dataQuery);
+            }
+        } else {
+            dataQuery.useCache = false;
+            this._processCacheItem(dataQuery);
+        }
+    },
+
+    _processCacheItem: function (dataQuery) {
+        var self = this;
+
+        var contentType = dataQuery.collectionName;
+        var hash = this._getHashForQuery(dataQuery);
+        return this._getCacheDataForContentType(contentType)
+            .then(function (cacheData) {
+                if (cacheData[hash]) {
+                    return self._isHashExpired(contentType, hash, dataQuery.maxAge)
+                        .then(function (isExpired) {
+                            if (isExpired && !dataQuery.forceCache) {
+                                return self._purgeForHash(contentType, hash)
+                                    .then(function () {
+                                        return self._cacheQuery(dataQuery, hash);
+                                    });
+                            } else {
+                                return self._everlive.offlineStorage.processQuery(dataQuery)
+                                    .then(function (result) {
+                                        dataQuery.onSuccess(result);
+                                    })
+                                    .catch(dataQuery.onError);
+                            }
+                        });
+                } else {
+                    return self._cacheQuery(dataQuery, hash);
+                }
+            });
+    },
+
+    _addObjectToCache: function (obj, contentType, maxAge) {
+        var itemHash = obj.Id;
+        return this._cacheResultFromDataQuery(contentType, itemHash, maxAge);
+    },
+
+    _cacheQuery: function (dataQuery, hash) {
+        var self = this;
+        var contentType = dataQuery.collectionName;
+
+        var originalSuccess = dataQuery.onSuccess;
+        dataQuery.onSuccess = function (response) {
+            var args = arguments;
+
+            return self._getCacheData()
+                .then(function () {
+                    var cacheForItems = [];
+                    var result = response.result;
+
+                    if (dataQuery.operation !== DataQuery.operations.count) {
+                        if (Array.isArray(result)) {
+                            _.each(result, function (singleResult) {
+                                var cacheItemPromise = self._addObjectToCache(singleResult, dataQuery.collectionName);
+                                cacheForItems.push(cacheItemPromise);
+                            });
+                        } else if (_.isObject(result)) {
+                            var cacheItemPromise = self._addObjectToCache(result, dataQuery.collectionName);
+                            cacheForItems.push(cacheItemPromise);
+                        }
+                    }
+
+                    return rsvp.all(cacheForItems)
+                        .then(function () {
+                            if (dataQuery.operation !== DataQuery.operations.count) {
+                                return self._cacheResultFromDataQuery(contentType, hash);
+                            }
+                        })
+                        .then(function () {
+                            return originalSuccess.apply(this, args);
+                        });
+                });
+        };
+
+        this._everlive.data(dataQuery.collectionName)._sendRequest(dataQuery);
+    },
+
+    _cacheResultFromDataQuery: function (contentType, hash) {
+        var cacheData = {};
+        cacheData[hash] = {
+            cachedAt: Date.now()
+        };
+
+        return this._persistCacheData(contentType, cacheData);
+    },
+
+    _getExpirationForHash: function (contentType, hash) {
+        return this._getCacheDataForContentType(contentType)
+            .then(function (cacheData) {
+                return cacheData[hash].cachedAt;
+            });
+    },
+
+    _isHashExpired: function (contentType, hash, maxAge) {
+        var self = this;
+
+        return this._getExpirationForHash(contentType, hash)
+            .then(function (cachedAt) {
+                var maxAgeForContentType = self.typeSettings && self.typeSettings[contentType] ? self.typeSettings[contentType].maxAge * 60 * 1000 : null;
+                var cacheAge = maxAge || maxAgeForContentType || self.maxAgeInMs;
+                return (cachedAt + cacheAge) < Date.now();
+            });
+    },
+
+    _purgeForHash: function (contentType, hash) {
+        var cacheData = {};
+        cacheData[hash] = null;
+
+        return this._persistCacheData(contentType, cacheData);
+    },
+
+    _getHashForQuery: function (dataQuery) {
+        if (dataQuery.operation === DataQuery.operations.readById) {
+            return dataQuery.additionalOptions.id;
+        }
+
+        var queryParams = dataQuery.getQueryParameters();
+        return this._hash(queryParams);
+    },
+
+    clear: function (contentType, success, error) {
+        var self = this;
+
+        return buildPromise(function (success, error) {
+            return self.persister.purge(contentType, function () {
+                delete self.cacheData[contentType];
+                if (self._everlive.offlineStorage.setup.enabled) {
+                    success();
+                } else {
+                    self._everlive.offlineStorage._queryProcessor._persister.purge(contentType, success, error);
+                }
+            }, error);
+        }, success, error);
+    },
+
+    clearAll: function (success, error) {
+        var self = this;
+        self.cacheData = null;
+
+        return buildPromise(function (success, error) {
+            return self.persister.purgeAll(function () {
+                if (self._everlive.offlineStorage.setup.enabled) {
+                    success();
+                } else {
+                    self._everlive.offlineStorage._queryProcessor._persister.purgeAll(success, error);
+                }
+            }, error)
+        }, success, error);
+    }
+};
+
+module.exports = CacheModule;
+},{"../EverliveError":47,"../common":58,"../constants":59,"../offline/offline":76,"../offline/offlinePersisters":77,"../query/DataQuery":85,"../query/Query":86,"../utils":99,"underscore":35}],57:[function(require,module,exports){
+'use strict';
+
+var CacheModule = require('./CacheModule');
+var _ = require('../common')._;
+
+var getDefaultOptions = function () {
+    return {
+        maxAge: 60,
+        enabled: false,
+        storage: {
+            storagePath: 'el_cache'
+        }
+    }
+};
+
+module.exports = {
+    initCaching: function (options) {
+        var cachingOptions;
+        var defaultOptions = getDefaultOptions();
+        if (options.caching === true) {
+            cachingOptions = _.deepExtend({}, defaultOptions);
+            cachingOptions.enabled = true;
+        } else {
+            cachingOptions = _.deepExtend(defaultOptions, options.caching);
+        }
+
+        if (options.caching !== false) {
+            this.setup.caching = cachingOptions;
+        }
+
+        this.cache = new CacheModule(cachingOptions, this);
+    },
+    _initStore: function (options) {
+        this.cache._initStore(options);
+    }
+};
+},{"../common":58,"./CacheModule":56}],58:[function(require,module,exports){
 (function (global){
 module.exports = (function () {
     var common = {};
@@ -17598,8 +17818,7 @@ module.exports = (function () {
         //for the everlive bundle without dependencies included, browserify replaces them with empty objects
         //we need to make sure that these dependencies are marked as undefined
         if (dependencyStore[localName] &&
-            typeof dependencyStore[localName] === 'object' &&
-            !Object.keys(dependencyStore[localName]).length) {
+            typeof dependencyStore[localName] === 'object' && !Object.keys(dependencyStore[localName]).length) {
 
             dependencyStore[localName] = undefined;
         }
@@ -17626,19 +17845,21 @@ module.exports = (function () {
     dependencyStore.Processor = require('../scripts/bs-expand-processor');
     exportDependency('Processor');
 
-    dependencyStore.Base64 = require('Base64');
-    exportDependency('Base64');
+    //dependencyStore.Base64 = require('Base64');
+    //exportDependency('Base64');
 
     dependencyStore.rsvp = require('rsvp');
     exportDependency('RSVP', 'rsvp');
 
     exportDependency('reqwest');
 
+    dependencyStore.jsonStringify = require('json-stable-stringify');
+    exportDependency('json-stable-stringify', 'jsonStringify');
+
     return common;
 }());
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-
-},{"../scripts/bs-expand-processor":36,"./everlive.platform":56,"./reqwest.nativescript":78,"./reqwest.nodejs":79,"Base64":1,"jstimezonedetect":8,"mingo":9,"mongo-query":11,"reqwest":30,"rsvp":31,"underscore":32}],54:[function(require,module,exports){
+},{"../scripts/bs-expand-processor":39,"./everlive.platform":61,"./reqwest.nativescript":90,"./reqwest.nodejs":91,"json-stable-stringify":7,"jstimezonedetect":11,"mingo":12,"mongo-query":14,"reqwest":33,"rsvp":34,"underscore":35}],59:[function(require,module,exports){
 /**
  * Constants used by the SDK
  * @typedef {Object} Everlive.Constants
@@ -17682,10 +17903,10 @@ var constants = {
     DefaultStoragePath: 'el_store',
 
     // the default location for storing files offline
-    DefaultFilesStoragePath: 'el_file_store/',
+    DefaultFilesStoragePath: 'el_file_store',
 
     // the default location for storing offline to online location map
-    DefaultFilesMetadataPath: 'el_file_mapping/',
+    DefaultFilesMetadataPath: 'el_file_mapping',
 
     EncryptionProvider: {
         Default: 'default',
@@ -17704,7 +17925,9 @@ var constants = {
         includeCount: 'X-Everlive-Include-Count',
         powerFields: 'X-Everlive-Power-Fields',
         debug: 'X-Everlive-Debug',
-        overrideSystemFields: 'X-Everlive-Override-System-Fields'
+        overrideSystemFields: 'X-Everlive-Override-System-Fields',
+        sdk: 'X-Everlive-Sdk',
+        sync: 'X-Everlive-Sync'
     },
     //Constants for different platforms in Everlive
     Platform: {
@@ -17817,14 +18040,21 @@ constants.syncBatchSize = 10;
 
 constants.AuthStoreKey = '__everlive_auth_key';
 
+constants.CachingStoreKey = '__everlive_cache';
+
 // the minimum interval between sync requests
 constants.defaultSyncInterval = 1000 * 60 * 10; // 10 minutes
 constants.fileUploadKey = 'fileUpload';
 constants.fileUploadDelimiter = '_';
 
+constants.FilesTypeNameLegacy = 'system.files';
+constants.FilesTypeName = 'Files';
+
+constants.MaxConcurrentDownloadTasks = 3;
+
 module.exports = constants;
 
-},{}],55:[function(require,module,exports){
+},{}],60:[function(require,module,exports){
 var CryptoJS = require('node-cryptojs-aes').CryptoJS;
 var AES = CryptoJS.AES;
 
@@ -17862,26 +18092,43 @@ module.exports = (function () {
 
     return CryptographicProvider;
 }());
-},{"node-cryptojs-aes":22}],56:[function(require,module,exports){
+},{"node-cryptojs-aes":25}],61:[function(require,module,exports){
 (function (global){
 var isNativeScript = Boolean(((typeof android !== 'undefined' && android && android.widget && android.widget.Button)
-    || (typeof UIButton !== 'undefined' && UIButton)));
+|| (typeof UIButton !== 'undefined' && UIButton)));
+
+var platform;
+var isCordova = false;
+var isWindowsPhone = false;
+var isAndroid = false;
 
 if (isNativeScript) {
     global.window = {
-            localStorage: {
-                removeItem: function () { } //shim for mongo-query under nativescript
-            }
-        };
+        localStorage: {
+            removeItem: function () {
+            } //shim for mongo-query under nativescript
+        }
+    };
+
 } else if (typeof window !== 'undefined') {
-    var isCordova = /^file:\/{3}[^\/]|x-wmapp/i.test(window.location.href) && /ios|iphone|ipod|ipad|android|iemobile/i.test(navigator.userAgent);
-    var isWindowsPhone = isCordova && /iemobile/i.test(navigator.userAgent);
-    var isAndroid = isCordova && cordova.platformId === 'android';
+    isCordova = /^file:\/{3}[^\/]|x-wmapp/i.test(window.location.href) && /ios|iphone|ipod|ipad|android|iemobile/i.test(navigator.userAgent);
+    isWindowsPhone = isCordova && /iemobile/i.test(navigator.userAgent);
+    isAndroid = isCordova && cordova.platformId === 'android';
 }
 
 var isNodejs = typeof exports === 'object' && typeof window === 'undefined';
 var isRequirejs = typeof define === 'function' && define.amd;
 var isDesktop = !isNativeScript && !isCordova && !isNodejs;
+
+if (isNativeScript) {
+    platform = 'ns';
+} else if (isNodejs) {
+    platform = 'nodejs';
+} else if (isDesktop) {
+    platform = 'desktop';
+} else if (isCordova) {
+    platform = 'cordova';
+}
 
 module.exports = {
     isCordova: isCordova,
@@ -17890,11 +18137,11 @@ module.exports = {
     isWindowsPhone: isWindowsPhone,
     isAndroid: isAndroid,
     isNodejs: isNodejs,
-    isRequirejs: isRequirejs
+    isRequirejs: isRequirejs,
+    platform: platform
 };
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-
-},{}],57:[function(require,module,exports){
+},{}],62:[function(require,module,exports){
 'use strict';
 
 /**
@@ -17916,7 +18163,7 @@ if (platform.isCordova || platform.isDesktop) {
 }
 
 module.exports = helpers;
-},{"../everlive.platform":56,"./html/htmlHelper":58}],58:[function(require,module,exports){
+},{"../everlive.platform":61,"./html/htmlHelper":63}],63:[function(require,module,exports){
 'use strict';
 
 var platform = require('../../everlive.platform');
@@ -17960,10 +18207,6 @@ module.exports = (function () {
             urlTemplate: '[protocol][hostname][apikey]/[operations][url]',
             server: 'bs1.cdn.telerik.com/image/v1/'
         };
-
-        if (config === true) {
-            config = defaults;
-        }
 
         config = config || {};
 
@@ -18145,10 +18388,10 @@ module.exports = (function () {
         /**
          * @method process
          * @memberOf Helpers.html
-         * @param {HtmlElement} elements
-         * @param {Object} settings A settings specifying custom behavior
-         * @param {boolean} [settings.responsive] A value specifying whether responsive processing can be applied on the element if available.
-         * @param {boolean} [settings.offline] A value specifying whether offline processing can be applied on the element if available.
+         * @param {HtmlElement|HtmlElement[]} elements
+         * @param {Object} settings A settings specifying custom behavior.
+         * @param {boolean} [settings.responsive] Whether to process the data-responsive attributes that help implement Responsive Images.
+         * @param {boolean} [settings.offline] Whether to process the data-offline attributes that help implement offline files.
          * @param {Function} [success] A success callback.
          * @param {Function} [error] An error callback.
          */
@@ -18156,32 +18399,11 @@ module.exports = (function () {
         /**
          * @method process
          * @memberOf Helpers.html
-         * @param {HtmlElement[]} elements
-         * @param {Object} settings A settings specifying custom behavior
-         * @param {boolean} [settings.responsive] A value specifying whether responsive processing can be applied on the element if available.
-         * @param {boolean} [settings.offline] A value specifying whether offline processing can be applied on the element if available.
-         * @param {Function} [success] A success callback.
-         * @param {Function} [error] An error callback.
-         */
-
-        /**
-         * @method process
-         * @memberOf Helpers.html
-         * @param {HtmlElement} elements
-         * @param {Object} settings A settings specifying custom behavior
-         * @param {boolean} [settings.responsive] A value specifying whether responsive processing can be applied on the element if available.
-         * @param {boolean} [settings.offline] A value specifying whether offline processing can be applied on the element if available.
-         * @returns {Promise} A promise to the process state
-         */
-
-        /**
-         * @method process
-         * @memberOf Helpers.html
-         * @param {HtmlElement[]} elements
-         * @param {Object} settings A settings specifying custom behavior
-         * @param {boolean} [settings.responsive] A value specifying whether responsive processing can be applied on the element if available.
-         * @param {boolean} [settings.offline] A value specifying whether offline processing can be applied on the element if available.
-         * @returns {Promise} A promise to the process state
+         * @param {HtmlElement|HtmlElement[]} elements
+         * @param {Object} settings A settings specifying custom behavior.
+         * @param {boolean} [settings.responsive] Whether to process the data-responsive attributes that help implement Responsive Images.
+         * @param {boolean} [settings.offline] Whether to process the data-offline attributes that help implement offline files.
+         * @returns {Promise} A promise to the process state.
          */
         process: function process(elements, settings, success, error) {
             var self = this;
@@ -18286,9 +18508,9 @@ module.exports = (function () {
         /**
          * @method processAll
          * @memberOf Helpers.html
-         * @param {Object} settings A settings specifying custom behavior
-         * @param {boolean} [settings.responsive] A value specifying whether responsive processing can be applied on the element if available.
-         * @param {boolean} [settings.offline] A value specifying whether offline processing can be applied on the element if available.
+         * @param {Object} settings A settings specifying custom behavior.
+         * @param {boolean} [settings.responsive] Whether to process the data-responsive attributes that help implement Responsive Images.
+         * @param {boolean} [settings.offline] Whether to process the data-offline attributes that help implement offline files.
          * @param {Function} [success] A success callback.
          * @param {Function} [error] An error callback.
          */
@@ -18296,36 +18518,28 @@ module.exports = (function () {
         /**
          * @method processAll
          * @memberOf Helpers.html
-         * @param {Object} settings A settings specifying custom behavior
-         * @param {boolean} [settings.responsive] A value specifying whether responsive processing can be applied on the element if available.
-         * @param {boolean} [settings.offline] A value specifying whether offline processing can be applied on the element if available.
-         * @returns {Promise} A promise to the process state
+         * @param {Object} settings A settings specifying custom behavior.
+         * @param {boolean} [settings.responsive] Whether to process the data-responsive attributes that help implement Responsive Images.
+         * @param {boolean} [settings.offline] Whether to process the data-offline attributes that help implement offline files.
+         * @returns {Promise} A promise to the process state.
          */
         processAll: function processAll(settings, success, error) {
             settings = this._defaultProcessSettings(settings);
             var responsiveSelector = '[' + this.options.attributes.enableResponsive + ']';
             var offlineSelector = '[' + this.options.attributes.enableOffline + ']';
 
-            var elements;
-
-            if (settings.responsive && settings.offline) {
-                elements = document.querySelectorAll(responsiveSelector + offlineSelector);
+            var responsiveElements = [];
+            if (settings.responsive) {
+                responsiveElements = document.querySelectorAll(responsiveSelector);
             }
 
-            if (!elements) {
-                var responsiveElements = [];
-                if (settings.responsive) {
-                    responsiveElements = document.querySelectorAll(responsiveSelector);
-                }
-
-                var offlineElements = [];
-                if (settings.offline) {
-                    offlineElements = document.querySelectorAll(offlineSelector);
-                }
-
-                var slice = [].slice;
-                elements = slice.call(responsiveElements).concat(slice.call(offlineElements));
+            var offlineElements = [];
+            if (settings.offline) {
+                offlineElements = document.querySelectorAll(offlineSelector);
             }
+
+            var slice = [].slice;
+            var elements = _.unique(slice.call(responsiveElements).concat(slice.call(offlineElements)));
 
 
             return this.process(elements, settings, success, error);
@@ -18335,7 +18549,7 @@ module.exports = (function () {
     return HtmlHelper;
 }());
 
-},{"../../EventEmitterProxy":42,"../../EverliveError":44,"../../common":53,"../../constants":54,"../../everlive.platform":56,"../../utils":87,"./htmlHelperOfflineModule":59,"./htmlHelperResponsiveModule":60}],59:[function(require,module,exports){
+},{"../../EventEmitterProxy":45,"../../EverliveError":47,"../../common":58,"../../constants":59,"../../everlive.platform":61,"../../utils":99,"./htmlHelperOfflineModule":64,"./htmlHelperResponsiveModule":65}],64:[function(require,module,exports){
 'use strict';
 
 var utils = require('../../utils');
@@ -18365,7 +18579,7 @@ module.exports = (function () {
                     return localUrl;
                 })
                 .catch(function (err) {
-                    if (err !== EverliveErrors.cannotDownloadOffline) {
+                    if (err.code !== EverliveErrors.cannotDownloadOffline.code) {
                         throw err;
                     }
 
@@ -18393,7 +18607,7 @@ module.exports = (function () {
 
     return HtmlHelperOfflineModule;
 }());
-},{"../../EverliveError":44,"../../common":53,"../../constants":54,"../../utils":87,"path":4}],60:[function(require,module,exports){
+},{"../../EverliveError":47,"../../common":58,"../../constants":59,"../../utils":99,"path":3}],65:[function(require,module,exports){
 'use strict';
 
 var common = require('../../common');
@@ -18585,7 +18799,7 @@ module.exports = (function () {
 
     return HtmlHelperResponsiveModule;
 }());
-},{"../../EverliveError":44,"../../common":53,"../../constants":54,"../../utils":87}],61:[function(require,module,exports){
+},{"../../EverliveError":47,"../../common":58,"../../constants":59,"../../utils":99}],66:[function(require,module,exports){
 /*!
  The MIT License (MIT)
  Copyright (c) 2013 Telerik AD
@@ -18607,7 +18821,7 @@ module.exports = (function () {
  */
 /*!
  Everlive SDK
- Version 1.3.5
+ Version 1.5.1
  */
 (function () {
     var Everlive = require('./Everlive');
@@ -18655,7 +18869,7 @@ module.exports = (function () {
         common.root.Everlive = Everlive;
     }
 }());
-},{"./Everlive":43,"./GeoPoint":47,"./Request":49,"./common":53,"./constants":54,"./everlive.platform":56,"./kendo/kendo.everlive":62,"./offline/offlinePersisters":68,"./query/Query":74,"./query/QueryBuilder":75,"./types/Data":84,"./utils":87}],62:[function(require,module,exports){
+},{"./Everlive":46,"./GeoPoint":50,"./Request":52,"./common":58,"./constants":59,"./everlive.platform":61,"./kendo/kendo.everlive":67,"./offline/offlinePersisters":77,"./query/Query":86,"./query/QueryBuilder":87,"./types/Data":96,"./utils":99}],67:[function(require,module,exports){
 var QueryBuilder = require('../query/QueryBuilder');
 var Query = require('../query/Query');
 var Request = require('../Request');
@@ -19194,7 +19408,161 @@ var EverliveError = require('../EverliveError').EverliveError;
         createHierarchicalDataSource: createHierarchicalDataSource
     };
 }());
-},{"../Everlive":43,"../EverliveError":44,"../Request":49,"../common":53,"../constants":54,"../query/Query":74,"../query/QueryBuilder":75}],63:[function(require,module,exports){
+},{"../Everlive":46,"../EverliveError":47,"../Request":52,"../common":58,"../constants":59,"../query/Query":86,"../query/QueryBuilder":87}],68:[function(require,module,exports){
+var _ = require('../common')._;
+
+var deepExtend = require('./underscoreDeepExtends');
+var compactObject = require('./underscoreCompactObject');
+var isObjectEmpty = require('./underscoreIsObjectEmpty');
+
+_.mixin({'deepExtend': deepExtend});
+_.mixin({'compactObject': compactObject});
+_.mixin({'isEmptyObject': isObjectEmpty});
+},{"../common":58,"./underscoreCompactObject":69,"./underscoreDeepExtends":70,"./underscoreIsObjectEmpty":71}],69:[function(require,module,exports){
+var _ = require('underscore');
+
+//http://stackoverflow.com/questions/14058193/remove-empty-properties-falsy-values-from-object-with-underscore-js
+module.exports = function compactObject(o) {
+    var newObject = {};
+    _.each(o, function(v, k) {
+        if(v !== null && v !== undefined) {
+            newObject[k] = v
+        }
+    });
+
+    return newObject;
+};
+
+},{"underscore":35}],70:[function(require,module,exports){
+/*  Copyright (C) 2012-2014  Kurt Milam - http://xioup.com | Source: https://gist.github.com/1868955
+ *   
+ *  Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ *  The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+ *
+ *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ **/
+
+// Based conceptually on the _.extend() function in underscore.js ( see http://documentcloud.github.com/underscore/#extend for more details )
+
+var _ = require('../common')._;
+
+module.exports = function deepExtend(obj) {
+    var parentRE = /#{\s*?_\s*?}/,
+        slice = Array.prototype.slice;
+
+    _.each(slice.call(arguments, 1), function (source) {
+        for (var prop in source) {
+            if (_.isUndefined(obj[prop]) || _.isFunction(obj[prop]) || _.isNull(source[prop]) || _.isDate(source[prop])) {
+                obj[prop] = source[prop];
+            }
+            else if (_.isString(source[prop]) && parentRE.test(source[prop])) {
+                if (_.isString(obj[prop])) {
+                    obj[prop] = source[prop].replace(parentRE, obj[prop]);
+                }
+            }
+            else if (_.isArray(obj[prop]) || _.isArray(source[prop])) {
+                if (!_.isArray(obj[prop]) || !_.isArray(source[prop])) {
+                    throw new Error('Trying to combine an array with a non-array (' + prop + ')');
+                } else {
+                    obj[prop] = _.reject(_.deepExtend(_.clone(obj[prop]), source[prop]), function (item) {
+                        return _.isNull(item);
+                    });
+                }
+            }
+            else if (_.isObject(obj[prop]) || _.isObject(source[prop])) {
+                if (!_.isObject(obj[prop]) || !_.isObject(source[prop])) {
+                    throw new Error('Trying to combine an object with a non-object (' + prop + ')');
+                } else {
+                    obj[prop] = _.deepExtend(_.clone(obj[prop]), source[prop]);
+                }
+            } else {
+                obj[prop] = source[prop];
+            }
+        }
+    });
+    return obj;
+};
+
+/**
+ * Dependency: underscore.js ( http://documentcloud.github.com/underscore/ )
+ *
+ * Mix it in with underscore.js:
+ * _.mixin({deepExtend: deepExtend});
+ *
+ * Call it like this:
+ * var myObj = _.deepExtend(grandparent, child, grandchild, greatgrandchild)
+ *
+ * Notes:
+ * Keep it DRY.
+ * This function is especially useful if you're working with JSON config documents. It allows you to create a default
+ * config document with the most common settings, then override those settings for specific cases. It accepts any
+ * number of objects as arguments, giving you fine-grained control over your config document hierarchy.
+ *
+ * Special Features and Considerations:
+ * - parentRE allows you to concatenate strings. example:
+ *   var obj = _.deepExtend({url: "www.example.com"}, {url: "http://#{_}/path/to/file.html"});
+ *   console.log(obj.url);
+ *   output: "http://www.example.com/path/to/file.html"
+ *
+ * - parentRE also acts as a placeholder, which can be useful when you need to change one value in an array, while
+ *   leaving the others untouched. example:
+ *   var arr = _.deepExtend([100,    {id: 1234}, true,  "foo",  [250, 500]],
+ *                          ["#{_}", "#{_}",     false, "#{_}", "#{_}"]);
+ *   console.log(arr);
+ *   output: [100, {id: 1234}, false, "foo", [250, 500]]
+ *
+ * - The previous example can also be written like this:
+ *   var arr = _.deepExtend([100,    {id:1234},   true,  "foo",  [250, 500]],
+ *                          ["#{_}", {},          false, "#{_}", []]);
+ *   console.log(arr);
+ *   output: [100, {id: 1234}, false, "foo", [250, 500]]
+ *
+ * - And also like this:
+ *   var arr = _.deepExtend([100,    {id:1234},   true,  "foo",  [250, 500]],
+ *                          ["#{_}", {},          false]);
+ *   console.log(arr);
+ *   output: [100, {id: 1234}, false, "foo", [250, 500]]
+ *
+ * - Array order is important. example:
+ *   var arr = _.deepExtend([1, 2, 3, 4], [1, 4, 3, 2]);
+ *   console.log(arr);
+ *   output: [1, 4, 3, 2]
+ *
+ * - You can remove an array element set in a parent object by setting the same index value to null in a child object.
+ *   example:
+ *   var obj = _.deepExtend({arr: [1, 2, 3, 4]}, {arr: ["#{_}", null]});
+ *   console.log(obj.arr);
+ *   output: [1, 3, 4]
+ *
+ **/
+},{"../common":58}],71:[function(require,module,exports){
+// http://stackoverflow.com/questions/4994201/is-object-empty
+'use strict';
+
+var hasOwnProperty = Object.prototype.hasOwnProperty;
+
+function isEmpty(obj) {
+
+    // null and undefined are "empty"
+    if (obj == null) return true;
+
+    // Assume if it has a length property with a non-zero value
+    // that that property is correct.
+    if (obj.length > 0)    return false;
+    if (obj.length === 0)  return true;
+
+    // Otherwise, does it have any properties of its own?
+    // Note that this doesn't handle
+    // toString and valueOf enumeration bugs in IE < 9
+    for (var key in obj) {
+        if (hasOwnProperty.call(obj, key)) return false;
+    }
+
+    return true;
+}
+
+module.exports = isEmpty;
+},{}],72:[function(require,module,exports){
 'use strict';
 
 var utils = require('../utils');
@@ -19210,15 +19578,22 @@ var CryptoJS = require('node-cryptojs-aes').CryptoJS;
 var errors = require('../EverliveError');
 var EverliveErrors = errors.EverliveErrors;
 var EverliveError = errors.EverliveError;
+var AutoQueue = require('../AutoQueue');
 
-var OfflineFilesModule = function (offlineFilesProcessor, everlive) {
+var OfflineFilesModule = function (offlineFilesProcessor, everlive, downloadsConcurrency) {
     this._offlineFilesProcessor = offlineFilesProcessor;
     this._everlive = everlive;
+    this._downloadsQueue = new AutoQueue(downloadsConcurrency);
 };
 
+/**
+ * @class OfflineFilesModule
+ * @classdesc A class that provides the means to operate with files in offline mode.
+ * @protected
+ */
 OfflineFilesModule.prototype = {
     _getFilenameMetadata: function (location, offlineFileInfo) {
-        return new rsvp.Promise(function (resolve) {
+        return new rsvp.Promise(function (resolve, reject) {
             reqwest({
                 url: location,
                 method: 'HEAD',
@@ -19235,16 +19610,13 @@ OfflineFilesModule.prototype = {
                     offlineFileInfo.filename = path.basename(xmlResponse.responseURL);
                 }
 
-                resolve();
-            }).catch(function () {
-                resolve();
-            });
-
+                resolve(xmlResponse.responseURL);
+            }).catch(reject);
         });
     },
 
     /**
-     * Updates a file's content
+     * Updates a file's content.
      * @memberof OfflineFilesModule.prototype
      * @method downloadOffline
      * @param {string} location A file location or the id of a file stored in Backend Services.
@@ -19252,7 +19624,7 @@ OfflineFilesModule.prototype = {
      * @returns {Promise} The promise for the request
      */
     /**
-     * Updates a file's content
+     * Updates a file's content.
      * @memberof OfflineFilesModule.prototype
      * @method downloadOffline
      * @param {string} location A file location or the id of a file stored in Backend Services.
@@ -19264,47 +19636,51 @@ OfflineFilesModule.prototype = {
         var self = this;
 
         return buildPromise(function (success, error) {
-            var offlineFileInfo;
-            return self._getOfflineFileInfo(location)
-                .then(function (_offlineFileInfo) {
-                    offlineFileInfo = _offlineFileInfo;
-                    if (overwrite) {
-                        return false;
-                    }
-
-                    return self.existsOffline(location);
-                })
-                .then(function (exists) {
-                    if (!exists) {
-                        if (self._everlive.isOnline()) {
-                            return utils.successfulPromise()
-                                .then(function () {
-                                    if (!offlineFileInfo.filename) {
-                                        return self._getFilenameMetadata(location, offlineFileInfo);
-                                    }
-                                })
-                                .then(function () {
-                                    return self._saveFile(offlineFileInfo.location, offlineFileInfo.filename);
-                                });
+            self._downloadsQueue.enqueue(function (cb) {
+                var offlineFileInfo;
+                return self._getOfflineFileInfo(location)
+                    .then(function (_offlineFileInfo) {
+                        offlineFileInfo = _offlineFileInfo;
+                        if (overwrite) {
+                            return false;
                         }
 
-                        error(EverliveErrors.cannotDownloadOffline);
-                    } else {
-                        return self._getOfflineFileInfo(location)
-                            .then(function (fileInfo) {
-                                return self._getOfflineLocation(fileInfo);
-                            });
-                    }
-                })
-                .then(success)
-                .catch(error);
+                        return self.existsOffline(location);
+                    })
+                    .then(function (exists) {
+                        if (!exists) {
+                            if (self._everlive.isOnline()) {
+                                return utils.successfulPromise()
+                                    .then(function () {
+                                        if (!offlineFileInfo.filename) {
+                                            return self._getFilenameMetadata(location, offlineFileInfo);
+                                        }
+                                    })
+                                    .then(function (locationAfterRedirect) {
+                                        var location = locationAfterRedirect || offlineFileInfo.location;
+                                        return self._saveFile(location, offlineFileInfo.filename, null, offlineFileInfo.location);
+                                    });
+                            }
+
+                            error(new EverliveError(EverliveErrors.cannotDownloadOffline));
+                        } else {
+                            return self._getOfflineFileInfo(location)
+                                .then(function (fileInfo) {
+                                    return self._getOfflineLocation(fileInfo);
+                                });
+                        }
+                    })
+                    .then(function (result) {
+                        cb(null, result);
+                    })
+                    .catch(cb);
+            }, success, error);
         }, success, error);
     },
 
-    _saveFile: function (location, filename, id) {
+    _saveFile: function (location, filename, id, cacheKey) {
         var self = this;
         var actualLocation;
-        location = self._sanitizeUrl(location);
 
         return self._downloadFile(location, filename)
             .then(function (_actualLocation) {
@@ -19314,7 +19690,7 @@ OfflineFilesModule.prototype = {
             .then(function (offlineFilesData) {
                 offlineFilesData.push({
                     offlineLocation: actualLocation,
-                    onlineLocation: location,
+                    onlineLocation: cacheKey || location,
                     id: id
                 });
 
@@ -19326,13 +19702,13 @@ OfflineFilesModule.prototype = {
     },
 
     /**
-     * Remove all files stored offline.
+     * Physically deletes the offline copies of all files.
      * @memberof OfflineFilesModule.prototype
      * @method purgeAll
-     * @returns {Promise} The promise for the request
+     * @returns {Promise} The promise for the request.
      */
     /**
-     * Remove all files stored offline.
+     * Physically deletes the offline copies of all files.
      * @memberof OfflineFilesModule.prototype
      * @method purgeAll
      * @param {Function} [success] A success callback.
@@ -19360,7 +19736,7 @@ OfflineFilesModule.prototype = {
         var filename = fileInfo.filename;
         var id = fileInfo.Id;
 
-        return self._offlineFilesProcessor.getOfflineLocation(url)
+        return self._offlineFilesProcessor.getOfflineLocation(url, id)
             .then(function (offlineUrl) {
                 if (offlineUrl) {
                     return offlineUrl;
@@ -19385,7 +19761,10 @@ OfflineFilesModule.prototype = {
             var sanitizedUrl = self._sanitizeUrl(url);
             var fileId = path.basename(sanitizedUrl);
             var extension = path.extname(name);
-            var filename = fileId + extension;
+            var filename = fileId;
+            if (path.extname(sanitizedUrl) !== extension) {
+                filename += extension;
+            }
 
             var fileParentDirectory = '';
             if (!utils.isGuid(url)) {
@@ -19402,7 +19781,7 @@ OfflineFilesModule.prototype = {
                 .then(function (location) {
                     fileTransfer.download(url, location, function () {
                         resolve(location);
-                    }, reject, {
+                    }, reject, true, {
                         headers: self._everlive.buildAuthHeader()
                     });
                 })
@@ -19435,14 +19814,14 @@ OfflineFilesModule.prototype = {
     },
 
     /**
-     * Check if a file exists offline.
+     * Checks if a file exists offline.
      * @memberof OfflineFilesModule.prototype
      * @method exists
      * @param {String} location The location or file id to check.
      * @returns {Promise} The promise for the request
      */
     /**
-     * Check if a file exists offline.
+     * Checks if a file exists offline.
      * @memberof OfflineFilesModule.prototype
      * @method exists
      * @param {String} location The location or file id to check.
@@ -19478,14 +19857,14 @@ OfflineFilesModule.prototype = {
 
 
     /**
-     * Remove a file from the offline storage.
+     * Physically deletes the offline copy of a file.
      * @memberof OfflineFilesModule.prototype
      * @method purge
      * @param {String} location The location or file id to remove.
-     * @returns {Promise} The promise for the request
+     * @returns {Promise} The promise for the request.
      */
     /**
-     * Check if a file exists offline.
+     * Physically deletes the offline copy of a file.
      * @memberof OfflineFilesModule.prototype
      * @method purge
      * @param {String} location The location or file id to check.
@@ -19511,14 +19890,14 @@ OfflineFilesModule.prototype = {
     },
 
     /**
-     * Get the native URL for a file which is stored offline.
+     * Gets the native URL for a file that is stored offline.
      * @memberof OfflineFilesModule.prototype
      * @method getOfflineLocation
      * @param {String} location The location or file id to process.
      * @returns {Promise} The promise for the request
      */
     /**
-     * Get the native URL for a file which is stored offline.
+     * Gets the native URL for a file that is stored offline.
      * @memberof OfflineFilesModule.prototype
      * @method getOfflineLocation
      * @param {String} location The location or file id to process.
@@ -19531,6 +19910,20 @@ OfflineFilesModule.prototype = {
         return buildPromise(function (success, error) {
             self._getOfflineFileInfo(location)
                 .then(self._getOfflineLocation.bind(self))
+                .then(function (offlineLocation) {
+                    if (offlineLocation) {
+                        return self.existsOffline(offlineLocation)
+                            .then(function (exists) {
+                                if (exists) {
+                                    return offlineLocation;
+                                }
+
+                                return null;
+                            });
+                    }
+
+                    return null;
+                })
                 .then(success)
                 .catch(error);
         }, success, error);
@@ -19548,7 +19941,7 @@ OfflineFilesModule.prototype = {
                 .then(function (response) {
                     var file = response.result;
                     resolve({
-                        location: self._sanitizeUrl(file.Uri),
+                        location: file.Uri,
                         filename: file.Filename,
                         Id: sanitizedUrl
                     });
@@ -19556,7 +19949,7 @@ OfflineFilesModule.prototype = {
                 .catch(function (err) {
                     if (err && err.code === EverliveErrors.itemNotFound.code) {
                         resolve({
-                            location: sanitizedUrl
+                            location: location
                         });
                     } else {
                         reject(err);
@@ -19619,7 +20012,7 @@ OfflineFilesModule.prototype = {
 };
 
 module.exports = OfflineFilesModule;
-},{"../EverliveError":44,"../Request":49,"../common":53,"../utils":87,"node-cryptojs-aes":22,"path":4}],64:[function(require,module,exports){
+},{"../AutoQueue":44,"../EverliveError":47,"../Request":52,"../common":58,"../utils":99,"node-cryptojs-aes":25,"path":3}],73:[function(require,module,exports){
 'use strict';
 
 var EverliveErrorModule = require('../EverliveError');
@@ -19646,12 +20039,12 @@ OfflineFilesProcessor.prototype = {
     validateFileCreateObject: function (obj, isSync) {
         return new rsvp.Promise(function (resolve, reject) {
             if (!obj.base64 && !isSync) {
-                return reject(EverliveErrors.missingOrInvalidFileContent);
+                return reject(new EverliveError(EverliveErrors.missingOrInvalidFileContent));
             } else if (!obj.ContentType) {
-                return reject(EverliveErrors.missingContentType);
+                return reject(new EverliveError(EverliveErrors.missingContentType));
             } else if (!obj.Filename) {
                 //TODO: [offline] add an appropriate error
-                return reject(EverliveErrors.invalidRequest);
+                return reject(new EverliveError(EverliveErrors.invalidRequest));
             }
 
             resolve();
@@ -19696,11 +20089,11 @@ OfflineFilesProcessor.prototype = {
         if (!isSync) {
             if (isCreate) {
                 if (!obj.base64) {
-                    return utils.rejectedPromise(EverliveErrors.missingOrInvalidFileContent);
+                    return utils.rejectedPromise(new EverliveError(EverliveErrors.missingOrInvalidFileContent));
                 }
 
                 if (!obj.ContentType) {
-                    return utils.rejectedPromise(EverliveErrors.missingContentType);
+                    return utils.rejectedPromise(new EverliveError(EverliveErrors.missingContentType));
                 }
             } else {
                 if (!obj.base64) {
@@ -19751,12 +20144,12 @@ OfflineFilesProcessor.prototype = {
                 .then(function (offlineFilesData) {
                     offlineFilesData.push({
                         offlineLocation: offlineFileInfo.offlineLocation,
-                        onlineLocation: onlineLocation
+                        onlineLocation: onlineLocation,
+                        id: obj._id
                     });
 
-                    //TODO: maybe save the filesdata?
-
                     obj.Length = offlineFileInfo.size;
+                    return self.saveOfflineFilesData();
                 });
         });
     },
@@ -19817,19 +20210,20 @@ OfflineFilesProcessor.prototype = {
                     return;
                 }
 
-                var offlineEntry = _.find(offlineFilesData, function (fileEntry) {
-                    return fileEntry.offlineLocation === url || fileEntry.onlineLocation === url || (id && fileEntry.id === id);
-                });
-
-                if (offlineEntry) {
-                    return offlineEntry.offlineLocation;
+                for (var i = 0; i < offlineFilesData.length; i++) {
+                    var fileEntry = offlineFilesData[i];
+                    var urlMatches = (url && (fileEntry.offlineLocation === url || fileEntry.onlineLocation === url));
+                    var idMatches = (id && fileEntry.id === id);
+                    if (urlMatches || idMatches) {
+                        return fileEntry.offlineLocation;
+                    }
                 }
             });
     }
 };
 
 module.exports = OfflineFilesProcessor;
-},{"../EverliveError":44,"../common":53,"../constants":54,"../everlive.platform":56,"../storages/FileStore":80,"../utils":87,"path":4}],65:[function(require,module,exports){
+},{"../EverliveError":47,"../common":58,"../constants":59,"../everlive.platform":61,"../storages/FileStore":92,"../utils":99,"path":3}],74:[function(require,module,exports){
 'use strict';
 
 var DataQuery = require('../query/DataQuery');
@@ -19871,12 +20265,17 @@ unsupportedUsersOperations[DataQuery.operations.userUnlinkFromProvider] = true;
 unsupportedUsersOperations[DataQuery.operations.userLogin] = true;
 unsupportedUsersOperations[DataQuery.operations.userLogout] = true;
 unsupportedUsersOperations[DataQuery.operations.userChangePassword] = true;
+unsupportedUsersOperations[DataQuery.operations.userResetPassword] = true;
 
 function buildUsersErrorMessage(dataQuery) {
+    var unsupportedUserSocialProviderOperations = [
+        DataQuery.operations.userLoginWithProvider,
+        DataQuery.operations.userLinkWithProvider,
+        DataQuery.operations.userUnlinkFromProvider
+    ];
+
     var operation = dataQuery.operation;
-    if (operation === DataQuery.operations.userLoginWithProvider ||
-        operation === DataQuery.operations.userLinkWithProvider ||
-        operation === DataQuery.operations.userUnlinkFromProvider) {
+    if (unsupportedUserSocialProviderOperations.indexOf(operation) !== -1) {
         operation += dataQuery.data.Provider || dataQuery.data.Identity.Provider;
     }
 
@@ -19905,26 +20304,8 @@ OfflineQueryProcessor.prototype = {
             });
         }
 
-        var sort = dataQuery.getHeaderAsJSON(Headers.sort);
-        var limit = dataQuery.getHeaderAsJSON(Headers.take);
-        var skip = dataQuery.getHeaderAsJSON(Headers.skip);
-        var select = dataQuery.getHeaderAsJSON(Headers.select);
-        var filter = dataQuery.getHeaderAsJSON(Headers.filter);
-        var expand = dataQuery.getHeaderAsJSON(Headers.expand);
-
-        if (dataQuery.filter instanceof Query) {
-            var filterObj = dataQuery.filter.build();
-            filter = filterObj.$where || filter || {};
-            sort = filterObj.$sort || sort;
-            limit = filterObj.$take || limit;
-            skip = filterObj.$skip || skip;
-            select = filterObj.$select || select;
-            expand = filterObj.$expand || expand;
-        } else {
-            filter = (dataQuery.filter || filter) || {};
-        }
-
-        var unsupportedOperators = utils.getUnsupportedOperators(filter);
+        var queryParams = dataQuery.getQueryParameters();
+        var unsupportedOperators = utils.getUnsupportedOperators(queryParams.filter);
         var unsupportedOperatorCount = unsupportedOperators.length;
         if (unsupportedOperatorCount) {
             return new rsvp.Promise(function (resolve, reject) {
@@ -19935,33 +20316,33 @@ OfflineQueryProcessor.prototype = {
                     errorMessage = 'The operators ' + unsupportedOperators.join(',') + 'are not supported in offline mode.';
                 }
 
-                reject(new EverliveError(errorMessage));
+                reject(new EverliveError(errorMessage, EverliveErrors.operationNotSupportedOffline.code));
             });
         }
 
-        offlineTransformations.traverseAndTransformFilterId(filter);
+        offlineTransformations.traverseAndTransformFilterId(queryParams.filter);
 
         switch (dataQuery.operation) {
             case DataQuery.operations.read:
-                return this.read(dataQuery, filter, sort, skip, limit, select, expand);
+                return this.read(dataQuery, queryParams.filter, queryParams.sort, queryParams.skip, queryParams.limit, queryParams.select, queryParams.expand);
             case DataQuery.operations.readById:
-                return this.readById(dataQuery, expand);
+                return this.readById(dataQuery, queryParams.expand);
             case DataQuery.operations.filesGetDownloadUrlById:
                 return this.getDownloadUrlById(dataQuery);
             case DataQuery.operations.count:
-                return this.count(dataQuery, filter);
+                return this.count(dataQuery, queryParams.filter);
             case DataQuery.operations.create:
                 return this.create(dataQuery);
             case DataQuery.operations.rawUpdate:
             case DataQuery.operations.update:
-                return this.update(dataQuery, filter);
+                return this.update(dataQuery, queryParams.filter);
             case DataQuery.operations.filesUpdateContent:
-                return this.updateFileContent(dataQuery, filter);
+                return this.updateFileContent(dataQuery, queryParams.filter);
             case DataQuery.operations.remove:
-                return this.remove(dataQuery, filter);
+                return this.remove(dataQuery, queryParams.filter);
             case DataQuery.operations.removeSingle:
-                filter._id = dataQuery.additionalOptions.id;
-                return this.remove(dataQuery, filter);
+                queryParams.filter._id = dataQuery.additionalOptions.id;
+                return this.remove(dataQuery, queryParams.filter);
             default:
                 return new rsvp.Promise(function (resolve, reject) {
                     if (dataQuery.isSync) {
@@ -20150,7 +20531,7 @@ OfflineQueryProcessor.prototype = {
                     var item = self._getById(collection, dataQuery.additionalOptions.id);
 
                     if (!item) {
-                        return reject(EverliveErrors.itemNotFound);
+                        return reject(new EverliveError(EverliveErrors.itemNotFound));
                     }
 
                     item = offlineTransformations.idTransform(item);
@@ -20452,7 +20833,7 @@ OfflineQueryProcessor.prototype = {
 
                         if (!itemExists && !isSync) {
                             // TODO: [offline] return the correct error
-                            throw new Error(EverliveErrors.itemNotFound);
+                            throw new EverliveError(EverliveErrors.itemNotFound);
                         }
 
                         self._applyUpdateOperation(updateExpression, itemToUpdate, collection, isSync, dataQuery.ModifiedAt);
@@ -20663,20 +21044,32 @@ OfflineQueryProcessor.prototype = {
         var self = this;
         this._collectionCache = {};
         return buildPromise(function (success, error) {
-            self._persister.purgeAll(success, error);
+            self._persister.purgeAll(function () {
+                if (self.everlive.setup.caching) {
+                    self.everlive.cache.clearAll(success, error);
+                } else {
+                    success();
+                }
+            }, error);
         }, success, error);
     },
 
     purge: function (contentType, success, error) {
         var self = this;
         return buildPromise(function (success, error) {
-            self._persister.purge(contentType, success, error);
+            self._persister.purge(contentType, function () {
+                if (self.everlive.setup.caching) {
+                    self.everlive.cache.clear(contentType, success, error);
+                } else {
+                    success();
+                }
+            }, error);
         }, success, error);
     }
 };
 
 module.exports = OfflineQueryProcessor;
-},{"../EverliveError":44,"../ExpandProcessor":45,"../common":53,"../constants":54,"../query/DataQuery":73,"../query/Query":74,"../utils":87,"./offlineTransformations":69,"path":4}],66:[function(require,module,exports){
+},{"../EverliveError":47,"../ExpandProcessor":48,"../common":58,"../constants":59,"../query/DataQuery":85,"../query/Query":86,"../utils":99,"./offlineTransformations":78,"path":3}],75:[function(require,module,exports){
 var DataQuery = require('../query/DataQuery');
 var everliveErrorModule = require('../EverliveError');
 var EverliveError = everliveErrorModule.EverliveError;
@@ -20701,13 +21094,6 @@ var syncLocation = {
     client: 'client'
 };
 
-var syncStartEventData = {
-    cancel: function () {
-        throw new EverliveError(EverliveErrors.syncCancelledByUser.message, EverliveErrors.syncCancelledByUser.code);
-    }
-};
-
-
 /**
  * @class OfflineModule
  * @classDesc A class providing access to the various offline storage features.
@@ -20726,19 +21112,18 @@ module.exports = (function () {
         this._isSynchronizing = false;
         this._encryptionProvider = encryptionProvider;
 
-        if (this.setup.enabled) {
-            this._offlineFilesProcessor = new OfflineFilesProcessor(this.setup, this._everlive);
-            this._queryProcessor = new OfflineQueryProcessor(persister, encryptionProvider, this._offlineFilesProcessor, this._everlive, this.setup);
+        this._offlineFilesProcessor = new OfflineFilesProcessor(this.setup, this._everlive);
+        this._queryProcessor = new OfflineQueryProcessor(persister, encryptionProvider,
+            this._offlineFilesProcessor, this._everlive, this.setup);
 
-
-            /**
-             * @memberOf OfflineModule
-             * @instance
-             * @description An instance of the [OfflineFilesModule]{@link OfflineFilesModule} class for working with files in offline mode.
-             * @member {OfflineFilesModule} files
-             */
-            this.files = new OfflineFilesModule(this._offlineFilesProcessor, this._everlive);
-        }
+        /**
+         * @memberOf Everlive.prototype
+         * @instance
+         * @description An instance of the [OfflineFilesModule]{@link OfflineFilesModule} class for working with files in offline mode.
+         * @member {OfflineFilesModule} files
+         */
+        this.files = new OfflineFilesModule(this._offlineFilesProcessor,
+            this._everlive, this.setup.files.maxConcurrentDownloads);
     }
 
     var getSyncFilterForItem = function (item) {
@@ -20846,7 +21231,7 @@ module.exports = (function () {
             return new rsvp.Promise(function (resolve) {
                 if (!self._isSynchronizing) {
                     self._isSynchronizing = true;
-                    self._everlive._emitter.emit('syncStart', syncStartEventData);
+                    self._everlive._emitter.emit('syncStart');
                     resolve();
                 } else {
                     resolve();
@@ -20855,14 +21240,7 @@ module.exports = (function () {
         },
 
         _fireSyncEnd: function () {
-            var self = this;
-
             this._isSynchronizing = false;
-            _.each(this._syncResultInfo.syncedItems, function (syncedItems) {
-                self._syncResultInfo.syncedToServer += _.where(syncedItems, {storage: syncLocation.server}).length;
-                self._syncResultInfo.syncedToClient += _.where(syncedItems, {storage: syncLocation.client}).length;
-            });
-
             this._everlive._emitter.emit('syncEnd', this._syncResultInfo);
             delete this._syncResultInfo;
         },
@@ -20910,7 +21288,7 @@ module.exports = (function () {
                         })
                         .then(function (res) {
                             var mergedWithServerResponseItem = _.extend({}, item, res.result);
-                            self._addSyncedItemToResult(mergedWithServerResponseItem, collectionName, syncLocation.server, offlineItemStates.created);
+                            self._onItemProcessed(mergedWithServerResponseItem, collectionName, syncLocation.server, offlineItemStates.created);
                             return filesCollection
                                 .isSync(true)
                                 .useOffline(true)
@@ -20995,7 +21373,7 @@ module.exports = (function () {
                         } else {
                             resolve(parsedResult);
                         }
-                    }, reject, options);
+                    }, reject, options, true);
                 });
             });
         },
@@ -21003,76 +21381,81 @@ module.exports = (function () {
         _addCreatedObjectToSyncPromises: function (syncPromises, dataCollection, resultingItemsForCreate, contentTypeData, collectionName, ids) {
             var self = this;
 
-            syncPromises[offlineItemStates.created] =
-                new rsvp.Promise(function (resolve, reject) {
-                    dataCollection
-                        .isSync(true)
-                        .applyOffline(false)
-                        .create(resultingItemsForCreate)
-                        .then(function (res) {
-                            resultingItemsForCreate = _.map(resultingItemsForCreate, function (item, index) {
-                                item.Id = res.result[index].Id;
-                                item.CreatedAt = item.ModifiedAt = res.result[index].CreatedAt;
-                                if (contentTypeData.isCustom) {
-                                    self._addSyncedItemToResult(item, collectionName, syncLocation.client, offlineItemStates.created);
-                                }
-
-                                return item;
+            var promise = new rsvp.Promise(function (resolve, reject) {
+                dataCollection
+                    .isSync(true)
+                    .applyOffline(false)
+                    .create(resultingItemsForCreate)
+                    .then(function (res) {
+                        resultingItemsForCreate = _.map(resultingItemsForCreate, function (item, index) {
+                            item.Id = res.result[index].Id;
+                            item.CreatedAt = item.ModifiedAt = res.result[index].CreatedAt;
+                            var resultingItem = _.find(contentTypeData.createdItems, function (createdItem) {
+                                return createdItem.resultingItem.Id === item.Id;
                             });
-                        }, function (err) {
-                            reject({
-                                type: offlineItemStates.created,
-                                items: resultingItemsForCreate,
-                                contentType: collectionName,
-                                error: err,
-                                storage: syncLocation.server
-                            })
-                        })
-                        .then(function () {
+
+                            if (resultingItem.isCustom) {
+                                self._onItemProcessed(item, collectionName, syncLocation.client, offlineItemStates.modified);
+                            }
+
+                            return item;
+                        });
+                    }, function (err) {
+                        throw {
+                            type: offlineItemStates.created,
+                            items: resultingItemsForCreate,
+                            contentType: collectionName,
+                            error: err,
+                            storage: syncLocation.server
+                        };
+                    })
+                    .then(function () {
+                        return dataCollection
+                            .isSync(true)
+                            .useOffline(true)
+                            .create(resultingItemsForCreate)
+                            .then(function () {
+                                _.each(resultingItemsForCreate, function (createdItem) {
+                                    self._onItemProcessed(createdItem, collectionName, syncLocation.server,
+                                        offlineItemStates.created);
+                                });
+                            }, function (err) {
+                                throw {
+                                    type: offlineItemStates.created,
+                                    items: resultingItemsForCreate,
+                                    contentType: collectionName,
+                                    error: err,
+                                    storage: syncLocation.client
+                                };
+                            });
+                    })
+                    .then(function () {
+                        if (ids && ids.length) {
+                            var filter = {Id: {$in: ids}};
                             return dataCollection
                                 .isSync(true)
                                 .useOffline(true)
-                                .create(resultingItemsForCreate)
-                                .then(function () {
-                                    _.each(resultingItemsForCreate, function (createdItem) {
-                                        self._addSyncedItemToResult(createdItem, collectionName, syncLocation.server, offlineItemStates.created);
-                                    });
-                                }, function (err) {
-                                    reject({
+                                .destroy(filter)
+                                .catch(function (err) {
+                                    throw {
                                         type: offlineItemStates.created,
                                         items: resultingItemsForCreate,
                                         contentType: collectionName,
                                         error: err,
                                         storage: syncLocation.client
-                                    })
+                                    };
                                 });
-                        })
-                        .then(function () {
-                            if (ids && ids.length) {
-                                var filter = {Id: {$in: ids}};
-                                return dataCollection
-                                    .isSync(true)
-                                    .useOffline(true)
-                                    .destroy(filter).catch(function (err) {
-                                        reject({
-                                            type: offlineItemStates.created,
-                                            items: resultingItemsForCreate,
-                                            contentType: collectionName,
-                                            error: err,
-                                            storage: syncLocation.client
-                                        })
-                                    });
-                            }
-                        })
-                        .then(resolve, function (err) {
-                            reject({
-                                type: offlineItemStates.created,
-                                items: resultingItemsForCreate,
-                                contentType: collectionName,
-                                error: err
-                            });
-                        });
-                });
+                        }
+                    })
+                    .then(resolve)
+                    .catch(function (err) {
+                        reject(err);
+                    });
+            });
+
+            _.each(resultingItemsForCreate, function (item) {
+                syncPromises[item.Id] = promise;
+            });
 
             return resultingItemsForCreate;
         },
@@ -21118,7 +21501,7 @@ module.exports = (function () {
                 });
             } else {
                 if (operation === DataQuery.operations.update) {
-                    self._addSyncedItemToResult(item, collectionName, syncLocation.server, offlineItemStates.modified);
+                    self._onItemProcessed(item, collectionName, syncLocation.server, offlineItemStates.modified);
                     var updatedItem = _.extend({}, item, {
                         ModifiedAt: res.ModifiedAt
                     });
@@ -21136,15 +21519,21 @@ module.exports = (function () {
                     return this.processQuery(updateQuery)
                         .then(function () {
                             if (isCustomItem) {
-                                self._addSyncedItemToResult(item, collectionName, syncLocation.client, offlineItemStates.modified);
+                                var existingItem = _.find(self._syncResultInfo.syncedItems[collectionName], function (syncedItem) {
+                                    return syncedItem.itemId === item.Id;
+                                });
+
+                                if (!existingItem) {
+                                    self._onItemProcessed(item, collectionName, syncLocation.client, offlineItemStates.modified);
+                                }
                             }
                         });
                 } else if (operation === DataQuery.operations.remove) {
-                    self._addSyncedItemToResult(item, collectionName, syncLocation.server, offlineItemStates.deleted);
+                    self._onItemProcessed(item, collectionName, syncLocation.server, offlineItemStates.deleted);
                     return this._purgeById(collectionName, item.Id)
                         .then(function () {
                             if (isCustomItem) {
-                                self._addSyncedItemToResult(item, collectionName, syncLocation.client, offlineItemStates.deleted);
+                                self._onItemProcessed(item, collectionName, syncLocation.client, offlineItemStates.deleted);
                             }
                         });
                 }
@@ -21183,24 +21572,13 @@ module.exports = (function () {
                     var conflictsWhileSync = [];
                     _.each(syncResults, function (syncResult, itemId) {
                         if (syncResult && syncResult.state === 'rejected') {
-                            var targetType = syncResult.reason.contentType;
                             if (syncResult.reason && syncResult.reason.code === EverliveErrors.syncConflict.code) {
                                 conflictsWhileSync.push(syncResult);
                             } else {
                                 // to save time and traffic we are using a single create request for all items
                                 // this is why if there is an error we need to split the items we tried to create
                                 // and set the same error for all items.
-                                var type = syncResult.reason.type;
-                                self._syncResultInfo.failedItems[targetType] = self._syncResultInfo.failedItems[targetType] || [];
-                                if (type === offlineItemStates.created) {
-                                    _.each(syncResult.reason.items, function (item) {
-                                        self._syncResultInfo.failedItems[targetType]
-                                            .push(_.extend({itemId: item.Id}, _.pick(syncResult.reason, 'storage', 'type', 'error')));
-                                    });
-                                } else {
-                                    self._syncResultInfo.failedItems[targetType]
-                                        .push(_.extend({itemId: itemId}, _.pick(syncResult.reason, 'storage', 'type', 'error')));
-                                }
+                                self._onItemFailed(syncResult, itemId);
                             }
                         }
                     });
@@ -21259,7 +21637,7 @@ module.exports = (function () {
                     .then(function () {
                         switch (syncQuery.operation) {
                             case DataQuery.operations.update:
-                                self._addSyncedItemToResult(serverItem, typeName, syncLocation.client, offlineItemStates.modified);
+                                self._onItemProcessed(serverItem, typeName, syncLocation.client, offlineItemStates.modified);
                                 // the files content type is special and needs to enable the file contents offline, so we cannot only
                                 // update the data
                                 if (utils.isContentType.files(typeName)) {
@@ -21271,10 +21649,10 @@ module.exports = (function () {
                                 }
                                 break;
                             case DataQuery.operations.create:
-                                self._addSyncedItemToResult(serverItem, typeName, syncLocation.client, offlineItemStates.created);
+                                self._onItemProcessed(serverItem, typeName, syncLocation.client, offlineItemStates.created);
                                 break;
                             case DataQuery.operations.removeSingle:
-                                self._addSyncedItemToResult(clientItem, typeName, syncLocation.client, offlineItemStates.deleted);
+                                self._onItemProcessed(clientItem, typeName, syncLocation.client, offlineItemStates.deleted);
                                 break;
                         }
                         resolve();
@@ -21310,29 +21688,27 @@ module.exports = (function () {
         _handleKeepClient: function (conflictingItem, contentTypeSyncData) {
             var serverItem = conflictingItem.serverItem;
             var clientItem = conflictingItem.clientItem;
-            if (serverItem && clientItem) {
-                var modifiedObject = _.extend(clientItem, {ModifiedAt: new Date(serverItem.ModifiedAt)});
+            var resultingItem;
+            var collection;
 
-                contentTypeSyncData.modifiedItems.push({
-                    remoteItem: conflictingItem.serverItem,
-                    resultingItem: modifiedObject,
-                    resolutionType: constants.ConflictResolution.KeepClient
-                });
+            if (serverItem && clientItem) {
+                resultingItem = _.extend(clientItem, {ModifiedAt: new Date(serverItem.ModifiedAt)});
+                collection = contentTypeSyncData.modifiedItems;
             } else if (serverItem && !clientItem) {
-                contentTypeSyncData.deletedItems.push({
-                    remoteItem: conflictingItem.serverItem,
-                    resultingItem: serverItem,
-                    resolutionType: constants.ConflictResolution.KeepClient
-                });
+                resultingItem = serverItem;
+                collection = contentTypeSyncData.deletedItems;
             } else if (!serverItem && clientItem) {
-                contentTypeSyncData.createdItems.push({
-                    remoteItem: conflictingItem.serverItem,
-                    resultingItem: clientItem,
-                    resolutionType: constants.ConflictResolution.KeepClient
-                });
+                resultingItem = clientItem;
+                collection = contentTypeSyncData.createdItems;
             } else {
                 throw new EverliveError('Both serverItem and clientItem are not set when syncing data with "KeepClient" resolution strategy.');
             }
+
+            collection.push({
+                remoteItem: conflictingItem.serverItem,
+                resultingItem: resultingItem,
+                resolutionType: constants.ConflictResolution.KeepClient
+            });
         },
 
         _handleCustom: function (conflictingItem, typeName, offlineSyncOperations, contentTypeSyncData) {
@@ -21350,6 +21726,8 @@ module.exports = (function () {
                 createItemOfflineQuery.isSync = true;
 
                 offlineSyncOperations.push(this.processQuery(createItemOfflineQuery));
+
+                this._onItemProcessed(serverItem, typeName, syncLocation.client, offlineItemStates.created);
             }
 
             if (serverItem && customItem && !clientItem) {
@@ -21444,15 +21822,28 @@ module.exports = (function () {
                 var serverItem = _.findWhere(serverItems, {Id: offlineItem.Id});
                 if (serverItem) {
                     if (serverItem.Id === offlineItem.Id && offlineItem[constants.offlineItemsStateMarker] === offlineItemStates.created) {
-                        self._syncResultInfo.failedItems[contentType] = self._syncResultInfo.failedItems[contentType] || [];
-                        self._syncResultInfo.failedItems[contentType].push({
-                            itemId: serverItem.Id,
-                            type: offlineItemStates.created,
-                            storage: syncLocation.client,
-                            error: EverliveErrors.syncError
-                        });
+                        if (self.setup.conflicts.strategy === constants.ConflictResolutionStrategy.Custom) {
+                            self._onItemFailed({
+                                type: offlineItemStates.modified,
+                                storage: syncLocation.client,
+                                error: new EverliveError(EverliveErrors.syncError),
+                                contentType: contentType
+                            }, offlineItem.Id);
 
-                        return;
+                            return self._onItemFailed({
+                                type: offlineItemStates.modified,
+                                storage: syncLocation.server,
+                                error: new EverliveError(EverliveErrors.syncError),
+                                contentType: contentType
+                            }, serverItem.Id);
+                        } else {
+                            return self._onItemFailed({
+                                type: offlineItemStates.created,
+                                storage: syncLocation.client,
+                                error: new EverliveError(EverliveErrors.syncError),
+                                contentType: contentType
+                            }, serverItem.Id);
+                        }
                     }
 
                     var clientItemChanged = !!offlineItem[constants.offlineItemsStateMarker];
@@ -21622,19 +22013,58 @@ module.exports = (function () {
                 });
         },
 
-        _addSyncedItemToResult: function (item, contentType, syncStorage, syncType) {
-            if (!this._syncResultInfo.syncedItems[contentType]) {
-                this._syncResultInfo.syncedItems[contentType] = [];
+        _onItemFailed: function (syncResult, itemId) {
+            var self = this;
+
+            var results = syncResult.reason ? syncResult.reason : syncResult;
+            var targetType = results.contentType;
+
+            var getFailedItem = function (id) {
+                var pickedObject = _.pick(results, 'storage', 'type', 'error');
+                return _.extend({
+                    itemId: id,
+                    contentType: targetType
+                }, pickedObject);
+            };
+
+            var failedItems = [];
+            if (results.type === offlineItemStates.created && results.items) {
+                failedItems = _.map(results.items, function (item) {
+                    return getFailedItem(item.Id);
+                });
+            } else {
+                failedItems.push(getFailedItem(itemId));
             }
 
+            self._syncResultInfo.failedItems[targetType] = self._syncResultInfo.failedItems[targetType] || [];
+            _.each(failedItems, function (failedItem) {
+                self._syncResultInfo.failedItems[targetType].push(failedItem);
+                self._fireItemProcessed(failedItem);
+            });
+        },
+
+        _onItemProcessed: function (item, contentType, syncStorage, syncType) {
             var syncInfo = {
                 itemId: item.Id,
                 type: syncType,
-                storage: syncStorage
+                storage: syncStorage,
+                contentType: contentType
             };
+
+            this._syncResultInfo.syncedItems[contentType] = this._syncResultInfo.syncedItems[contentType] || [];
             this._syncResultInfo.syncedItems[contentType].push(syncInfo);
 
-            this._everlive._emitter.emit('itemSynced', syncInfo);
+            if (syncInfo.storage == syncLocation.server) {
+                this._syncResultInfo.syncedToServer++;
+            } else {
+                this._syncResultInfo.syncedToClient++;
+            }
+
+            this._fireItemProcessed(syncInfo);
+        },
+
+        _fireItemProcessed: function (syncInfo) {
+            this._everlive._emitter.emit('itemProcessed', syncInfo);
         },
 
         _getClientWinsSyncData: function (collections) {
@@ -21735,7 +22165,7 @@ module.exports = (function () {
                     .then(function (onlineResponse) {
                         var onlineResult = onlineResponse.result;
                         item.ModifiedAt = onlineResult.ModifiedAt;
-                        self._addSyncedItemToResult(item, collectionName, syncLocation.server, offlineItemStates.modified);
+                        self._onItemProcessed(item, collectionName, syncLocation.server, offlineItemStates.modified);
                         return sdk.files
                             .isSync(true)
                             .useOffline(true)
@@ -21763,7 +22193,7 @@ module.exports = (function () {
                     .applyOffline(false)
                     .updateSingle(item)
                     .then(function (res) {
-                        self._addSyncedItemToResult(item, collectionName, syncLocation.server, offlineItemStates.modified);
+                        self._onItemProcessed(item, collectionName, syncLocation.server, offlineItemStates.modified);
                         var updatedItem = _.extend({}, item, {
                             ModifiedAt: res.ModifiedAt
                         });
@@ -21835,7 +22265,7 @@ module.exports = (function () {
                             .applyOffline(false)
                             .destroySingle(itemFilter)
                             .then(function () {
-                                self._addSyncedItemToResult(item, collectionName, syncLocation.server, offlineItemStates.deleted);
+                                self._onItemProcessed(item, collectionName, syncLocation.server, offlineItemStates.deleted);
                                 return self._purgeById(collectionName, item.Id).then(function () {
                                     resolve();
                                 }, function (err) {
@@ -21902,7 +22332,7 @@ module.exports = (function () {
                     .then(function (response) {
                         var file = response.result;
                         if (file.ModifiedAt.getTime() !== item.ModifiedAt.getTime()) {
-                            reject(_.extend({}, EverliveErrors.syncConflict, {
+                            reject(_.extend({}, new EverliveError(EverliveErrors.syncConflict), {
                                 contentType: collectionName
                             }));
                         } else {
@@ -22071,11 +22501,12 @@ module.exports = (function () {
 
     return OfflineModule;
 })();
-},{"../EverliveError":44,"../Request":49,"../common":53,"../constants":54,"../query/DataQuery":73,"../query/RequestOptionsBuilder":76,"../utils":87,"./OfflineFilesModule":63,"./OfflineFilesProcessor":64,"./OfflineQueryProcessor":65,"./offlineTransformations":69,"path":4}],67:[function(require,module,exports){
+
+},{"../EverliveError":47,"../Request":52,"../common":58,"../constants":59,"../query/DataQuery":85,"../query/RequestOptionsBuilder":88,"../utils":99,"./OfflineFilesModule":72,"./OfflineFilesProcessor":73,"./OfflineQueryProcessor":74,"./offlineTransformations":78,"path":3}],76:[function(require,module,exports){
 var constants = require('../constants');
-var persistersModule = require('./offlinePersisters');
-var LocalStoragePersister = persistersModule.LocalStoragePersister;
-var FileSystemPersister = persistersModule.FileSystemPersister;
+var persisters = require('./offlinePersisters');
+var LocalStoragePersister = persisters.LocalStoragePersister;
+var FileSystemPersister = persisters.FileSystemPersister;
 var OfflineStorageModule = require('./OfflineStorageModule');
 var EverliveError = require('../EverliveError').EverliveError;
 var isNativeScript = require('../everlive.platform').isNativeScript;
@@ -22106,7 +22537,8 @@ var defaultOfflineStorageOptions = {
     },
     files: {
         storagePath: constants.DefaultFilesStoragePath,
-        metaPath: constants.DefaultFilesMetadataPath
+        metaPath: constants.DefaultFilesMetadataPath,
+        maxConcurrentDownloads: constants.MaxConcurrentDownloadTasks
     }
 };
 
@@ -22127,27 +22559,8 @@ module.exports = (function () {
     };
 
     var initStoragePersister = function initStoragePersister(options) {
-        var persister;
-        var storageProvider = options.storage.provider;
-        var storageProviderImplementation = options.storage.implementation;
         var storageKey = options.storage.name || 'everliveOfflineStorage_' + this.setup.apiKey;
-        if (_.isObject(storageProviderImplementation) && storageProvider === constants.StorageProvider.Custom) {
-            persister = storageProviderImplementation;
-        } else {
-            switch (storageProvider) {
-                case constants.StorageProvider.LocalStorage:
-                    persister = new LocalStoragePersister(storageKey, options);
-                    break;
-                case constants.StorageProvider.FileSystem:
-                    persister = new FileSystemPersister(storageKey, options);
-                    break;
-                case constants.StorageProvider.Custom:
-                    throw new EverliveError('Custom storage provider requires an implementation object');
-                default:
-                    throw new EverliveError('Unsupported storage type ' + storageProvider);
-            }
-        }
-
+        var persister = persisters.getPersister(storageKey, options);
         options.storage.implementation = persister;
         return persister;
     };
@@ -22174,7 +22587,8 @@ module.exports = (function () {
         return encryptor;
     };
 
-    var buildOfflineStorageModule = function buildOfflineStorageModule(storageOptions) {
+    function buildOfflineStorageOptions(sdkOptions) {
+        var storageOptions = sdkOptions.offline || sdkOptions.offlineStorage;
         var options;
         if (storageOptions === true) { // explicit check for shorthand initialization
             options = _.defaults({}, defaultOfflineStorageOptions);
@@ -22183,38 +22597,74 @@ module.exports = (function () {
             options.storage = _.defaults(storageOptions.storage, defaultOfflineStorageOptions.storage);
             options.encryption = _.defaults(storageOptions.encryption, defaultOfflineStorageOptions.encryption);
             options.conflicts = _.defaults(storageOptions.conflicts, defaultOfflineStorageOptions.conflicts);
+            options.files = _.defaults(storageOptions.files, defaultOfflineStorageOptions.files);
         } else {
             options = _.defaults({}, defaultOfflineStorageOptions);
             options.enabled = false;
+            if (!storageOptions) {
+                sdkOptions.offlineStorage = options;
+            }
         }
 
-        if (options.enabled) {
-            var persister = initStoragePersister.call(this, options, storageOptions);
-            var encryptionProvider = initEncryptionProvider.call(this, options);
-        }
+        options.cacheEnabled = sdkOptions.caching && sdkOptions.caching.enabled;
+        return options;
+    }
+
+    var buildOfflineStorageModule = function buildOfflineStorageModule(sdkOptions) {
+        var options = buildOfflineStorageOptions(sdkOptions);
+        var persister = initStoragePersister.call(this, options);
+        var encryptionProvider = initEncryptionProvider.call(this, options);
 
         return new OfflineStorageModule(this, options, persister, encryptionProvider);
     };
 
     var initOfflineStorage = function (options) {
-        this.offlineStorage = buildOfflineStorageModule.call(this, options.offlineStorage);
+        this.offlineStorage = buildOfflineStorageModule.call(this, options);
     };
 
     return {
-        initOfflineStorage: initOfflineStorage
+        initOfflineStorage: initOfflineStorage,
+        buildOfflineStorageOptions: buildOfflineStorageOptions
     }
 }());
-},{"../EverliveError":44,"../common":53,"../constants":54,"../encryption/CryptographicProvider":55,"../everlive.platform":56,"./OfflineStorageModule":66,"./offlinePersisters":68}],68:[function(require,module,exports){
+},{"../EverliveError":47,"../common":58,"../constants":59,"../encryption/CryptographicProvider":60,"../everlive.platform":61,"./OfflineStorageModule":75,"./offlinePersisters":77}],77:[function(require,module,exports){
 var BasePersister = require('./persisters/BasePersister');
 var LocalStoragePersister = require('./persisters/LocalStoragePersister');
 var FileSystemPersister = require('./persisters/FileSystemPersister');
+var constants = require('../constants');
+var EverliveError = require('../EverliveError').EverliveError;
+var _ = require('../common')._;
 
 module.exports = {
     BasePersister: BasePersister,
     LocalStoragePersister: LocalStoragePersister,
-    FileSystemPersister: FileSystemPersister
+    FileSystemPersister: FileSystemPersister,
+    getPersister: function (storageKey, options) {
+        var persister;
+
+        var storageProvider = options.storage.provider;
+        var storageProviderImplementation = options.storage.implementation;
+        if (_.isObject(storageProviderImplementation) && storageProvider === constants.StorageProvider.Custom) {
+            persister = storageProviderImplementation;
+        } else {
+            switch (storageProvider) {
+                case constants.StorageProvider.LocalStorage:
+                    persister = new LocalStoragePersister(storageKey, options);
+                    break;
+                case constants.StorageProvider.FileSystem:
+                    persister = new FileSystemPersister(storageKey, options);
+                    break;
+                case constants.StorageProvider.Custom:
+                    throw new EverliveError('Custom storage provider requires an implementation object');
+                default:
+                    throw new EverliveError('Unsupported storage type ' + storageProvider);
+            }
+        }
+
+        return persister;
+    }
 };
-},{"./persisters/BasePersister":70,"./persisters/FileSystemPersister":71,"./persisters/LocalStoragePersister":72}],69:[function(require,module,exports){
+},{"../EverliveError":47,"../common":58,"../constants":59,"./persisters/BasePersister":79,"./persisters/FileSystemPersister":80,"./persisters/LocalStoragePersister":81}],78:[function(require,module,exports){
 'use strict';
 
 var constants = require('../constants');
@@ -22298,7 +22748,7 @@ var offlineTransformations = {
 };
 
 module.exports = offlineTransformations;
-},{"../common":53,"../constants":54}],70:[function(require,module,exports){
+},{"../common":58,"../constants":59}],79:[function(require,module,exports){
 'use strict';
 
 var EverliveError = require('../../EverliveError').EverliveError;
@@ -22408,7 +22858,7 @@ var BasePersister = (function () {
 }());
 
 module.exports = BasePersister;
-},{"../../EverliveError":44,"../../common":53,"../../utils":87}],71:[function(require,module,exports){
+},{"../../EverliveError":47,"../../common":58,"../../utils":99}],80:[function(require,module,exports){
 'use strict';
 
 var FileStore = require('../../storages/FileStore');
@@ -22535,7 +22985,7 @@ var FileSystemPersister = (function () {
 }());
 
 module.exports = FileSystemPersister;
-},{"../../EverliveError":44,"../../common":53,"../../everlive.platform":56,"../../storages/FileStore":80,"../../utils":87,"./BasePersister":70,"path":4,"util":7}],72:[function(require,module,exports){
+},{"../../EverliveError":47,"../../common":58,"../../everlive.platform":61,"../../storages/FileStore":92,"../../utils":99,"./BasePersister":79,"path":3,"util":6}],81:[function(require,module,exports){
 'use strict';
 
 var common = require('../../common');
@@ -22579,10 +23029,16 @@ var LocalStoragePersister = (function () {
     };
 
     LocalStoragePersister.prototype.purge = function (contentType, success, error) {
+        var self = this;
+
         try {
             var key = this._getKey(contentType);
             this._removeItem(key);
-            success();
+            this._getContentTypes(function (contentTypes) {
+                contentTypes = _.without(contentTypes, contentType);
+                self._setContentTypesCollection(contentTypes);
+                success();
+            }, error);
         } catch (e) {
             error(e);
         }
@@ -22656,8 +23112,1217 @@ var LocalStoragePersister = (function () {
 }());
 
 module.exports = LocalStoragePersister;
-},{"../../common":53,"../../storages/LocalStore":81,"./BasePersister":70,"util":7}],73:[function(require,module,exports){
+},{"../../common":58,"../../storages/LocalStore":93,"./BasePersister":79,"util":6}],82:[function(require,module,exports){
+var buildPromise = require('../utils').buildPromise;
+var EverliveError = require('../EverliveError').EverliveError;
+var Platform = require('../constants').Platform;
+var common = require('../common');
+var jstz = common.jstz;
+var _ = common._;
+
+module.exports = (function () {
+    /**
+     * @class CurrentDevice
+     * @deprecated
+     * @protected
+     * @param pushHandler
+     * @constructor
+     */
+    var CurrentDevice = function (pushHandler) {
+
+        if (!window.cordova) {
+                throw new EverliveError('Error: currentDevice() can only be called from within a hybrid mobile app, after \'deviceready\' event has been fired.');
+        }
+
+        this._pushHandler = pushHandler;
+        this._initSuccessCallback = null;
+        this._initErrorCallback = null;
+
+        //Suffix for the global callback functions
+        this._globalFunctionSuffix = null;
+
+        this.pushSettings = null;
+        this.pushToken = null;
+        this.isInitialized = false;
+        this.isInitializing = false;
+
+        this.emulatorMode = false;
+    };
+
+    CurrentDevice.ensurePushIsAvailable = function() {
+        var isPushNotificationPluginAvailable = (typeof window !== 'undefined' && window.plugins && window.plugins.pushNotification);
+
+        if (!isPushNotificationPluginAvailable) {
+            throw new EverliveError("The push notification plugin is not available. Ensure that the pushNotification plugin is included " +
+            "and use after `deviceready` event has been fired.");
+        }
+
+    };
+
+    CurrentDevice.prototype = {
+
+        /**
+         * Initializes the current device for push notifications. This method requests a push token from the device vendor and enables the push notification functionality on the device. Once this is done, you can register the device in {{site.TelerikBackendServices}} using the register() method.
+         * @method enableNotifications
+         * @name enableNotifications
+         * @memberOf CurrentDevice.prototype
+         * @param {PushSettings} pushSettings An object specifying various settings for the initialization.
+         * @returns {Object} The promise for the request.
+         */
+        /**
+         * Initializes the current device for push notifications. This method requests a push token from the device vendor and enables the push notification functionality on the device. Once this is done, you can register the device in Everlive using the register() method.
+         * @method enableNotifications
+         * @name enableNotifications
+         * @memberOf CurrentDevice.prototype
+         * @param {PushSettings} pushSettings An object specifying various settings for the initialization.
+         * @param {Function} [success] Callback to invoke on success.
+         * @param {Function} [error] Callback to invoke on error.
+         */
+        enableNotifications: function (pushSettings, success, error) {
+            this.pushSettings = this._cleanPlatformsPushSettings(pushSettings);
+
+            return buildPromise(_.bind(this._initialize, this), success, error);
+        },
+
+        /**
+         * Disables push notifications for the current device. This method invalidates any push tokens that were obtained for the device from the current application.
+         * @method disableNotifications
+         * @name disableNotifications
+         * @memberOf CurrentDevice.prototype
+         * @returns {Object} The promise for the request.
+         */
+        /**
+         * Disables push notifications for the current device. This method invalidates any push tokens that were obtained for the device from the current application.
+         * @method disableNotifications
+         * @name disableNotifications
+         * @memberOf CurrentDevice.prototype
+         * @param {Function} [success] Callback to invoke on success.
+         * @param {Function} [error] Callback to invoke on error.
+         */
+        disableNotifications: function (success, error) {
+            var self = this;
+
+            return this.unregister().then(
+                function () {
+                    return buildPromise(
+                        function (success, error) {
+                            if (self.emulatorMode) {
+                                success();
+                            } else {
+                                var pushNotification = window.plugins.pushNotification;
+                                var unregisterOptions;
+                                var platformType = self._getPlatformType();
+                                if (platformType === Platform.WindowsPhone) {
+                                    unregisterOptions = {'channelName': self.pushSettings.wp8.channelName};
+                                }
+                                pushNotification.unregister(
+                                    function () {
+                                        self.isInitialized = false;
+                                        success();
+                                    },
+                                    error,
+                                    unregisterOptions
+                                );
+                            }
+                        },
+                        success,
+                        error
+                    );
+                },
+                error
+            );
+        },
+
+        /**
+         * Returns the push registration for the current device.
+         * @memberOf CurrentDevice.prototype
+         * @method getRegistration
+         * @name getRegistration
+         * @returns {Object} The promise for the request.
+         */
+        /**
+         * Returns the push registration for the current device.
+         * @memberOf CurrentDevice.prototype
+         * @method getRegistration
+         * @name getRegistration
+         * @param {Function} success Callback to invoke on success.
+         * @param {Function} error Callback to invoke on error.
+         */
+        getRegistration: function (success, error) {
+            var deviceId = encodeURIComponent(this._getDeviceId());
+            return this._pushHandler.devices.getById('HardwareId/' + deviceId, success, error);
+        },
+
+        /**
+         * Registers the current device for push notifications in {{site.TelerikBackendServices}}. This method can be called only after [enableNotifications()]{@link currentDevice.enableNotifications} has completed successfully.
+         * @memberOf CurrentDevice.prototype
+         * @method register
+         * @name register
+         * @param {Object} customParameters Custom parameters for the registration.
+         * @returns {Object} The promise for the request.
+         */
+        /**
+         * Registers the current device for push notifications in {{site.TelerikBackendServices}}. This method can be called only after [enableNotifications()]{@link currentDevice.enableNotifications} has completed successfully.
+         * @memberOf CurrentDevice.prototype
+         * @method register
+         * @name register
+         * @param {Object} customParameters Custom parameters for the registration.
+         * @param {Function} [success] Callback to invoke on success.
+         * @param {Function} [error] Callback to invoke on error.
+         */
+        register: function (customParameters, success, error) {
+            var self = this;
+
+            var deviceRegistration = {};
+            if (customParameters !== undefined) {
+                deviceRegistration.Parameters = customParameters;
+            }
+
+            return this._populateRegistrationObject(deviceRegistration).then(
+                function () {
+                    return self._pushHandler.devices.create(deviceRegistration, success, error);
+                },
+                error
+            );
+        },
+
+        /**
+         * Unregisters the current device from push notifications in {{site.TelerikBackendServices}}. After this call completes successfully, {{site.bs}} will no longer send notifications to this device. Note that this does not prevent the device from receiving notifications and does not invalidate push tokens.
+         * @memberOf CurrentDevice.prototype
+         * @method unregister
+         * @name unregister
+         * @returns {Object} The promise for the request.
+         */
+        /**
+         * Unregisters the current device from push notifications in {{site.TelerikBackendServices}}. After this call completes successfully, {{site.bs}} will no longer send notifications to this device. Note that this does not prevent the device from receiving notifications and does not invalidate push tokens.
+         * @memberOf CurrentDevice.prototype
+         * @method unregister
+         * @name unregister
+         * @param {Function} [success] Callback to invoke on success.
+         * @param {Function} [error] Callback to invoke on error.
+         */
+        unregister: function (success, error) {
+            var deviceId = encodeURIComponent(device.uuid);
+            return this._pushHandler.devices.destroySingle({Id: 'HardwareId/' + deviceId}, success, error);
+        },
+
+        /**
+         * Updates the registration of the current device.
+         * @memberOf CurrentDevice.prototype
+         * @method updateRegistration
+         * @name updateRegistration
+         * @param {Object} customParameters Custom parameters for the registration. If undefined, customParameters are not updated.
+         * @returns {Object} The promise for the request.
+         */
+        /**
+         * Updates the registration for the current device.
+         * @memberOf CurrentDevice.prototype
+         * @method updateRegistration
+         * @name updateRegistration
+         * @param {Object} customParameters Custom parameters for the registration. If undefined, customParameters are not updated.
+         * @param {Function} [success] Callback to invoke on success.
+         * @param {Function} [error] Callback to invoke on error.
+         */
+        updateRegistration: function (customParameters, success, error) {
+            var self = this;
+
+            var deviceRegistration = {};
+            if (customParameters !== undefined) {
+                deviceRegistration.Parameters = customParameters;
+            }
+
+            return this._populateRegistrationObject(deviceRegistration).then(
+                function () {
+                    deviceRegistration.Id = 'HardwareId/' + encodeURIComponent(deviceRegistration.HardwareId);
+                    return self._pushHandler.devices.updateSingle(deviceRegistration, success, error);
+                },
+                error
+            );
+        },
+
+        /**
+         * This method provides a different operation on each supported platform:
+         *
+         * - On iOS: Checks if Notifications is enabled for this application in the device's Notification Center.
+         * - On Windows Phone: Checks if the application has an active open channel for communication with the Microsoft Push Notification Service. The outcome does not depend on the device's notification settings.
+         * - On Android: Checks if the application has established a connection with Google Cloud Messaging. The outcome does not depend on the device's notification settings.
+         * @method areNotificationsEnabled
+         * @name areNotificationsEnabled
+         * @memberOf Push.prototype
+         * @param {Object} options An object passed to the Push Notification plugin's areNotificationsEnabled method
+         * @returns {Promise} The promise for the request.
+         */
+        /**
+         * iOS: Checks if the Notifications are enabled for this Application in the Device's Notification Center.
+         * Windows Phone: Checks if the Application has an active opened Channel for communication with the Notification Service. Not relying on the device notification settings.
+         * Android: Checks if the Application has established connection with the Notification Service. Not relying on the device notification settings.
+         * @method areNotificationsEnabled
+         * @name areNotificationsEnabled
+         * @memberOf Push.prototype
+         * @param {Object} options an object passed to the Push Notification plugin's areNotificationsEnabled method.
+         * @param {Function} [onSuccess] Callback to invoke on successful check. Passes a single boolean value: true or false.
+         * @param {Function} [onError] Callback to invoke when an error in the push plugin has occurred.
+         */
+        areNotificationsEnabled: function (options, onSuccess, onError) {
+            options = options || {};
+            var pushNotification = window.plugins.pushNotification;
+
+            return buildPromise(function (successCb, errorCb) {
+                pushNotification.areNotificationsEnabled(successCb, errorCb, options);
+            }, onSuccess, onError);
+        },
+
+        _initializeInteractivePush: function (iOSSettings, success, error) {
+            var pushPlugin = window.plugins.pushNotification;
+
+            var interactiveSettings = iOSSettings.interactiveSettings;
+            var notificationTypes = [];
+            if (iOSSettings.alert) {
+                notificationTypes.push(pushPlugin.UserNotificationTypes.Alert);
+            }
+            if (iOSSettings.badge) {
+                notificationTypes.push(pushPlugin.UserNotificationTypes.Badge);
+            }
+            if (iOSSettings.sound) {
+                notificationTypes.push(pushPlugin.UserNotificationTypes.Sound);
+            }
+
+            var getAction = function (actionIdentifier) {
+                var action = _.find(interactiveSettings.actions, function (action) {
+                    return action.identifier === actionIdentifier;
+                });
+
+                return action;
+            };
+            var categories = _.map(interactiveSettings.categories, function (category) {
+                return {
+                    identifier: category.identifier,
+                    actionsForDefaultContext: _.map(category.actionsForDefaultContext, getAction),
+                    actionsForMinimalContext: _.map(category.actionsForMinimalContext, getAction)
+                }
+            });
+
+            pushPlugin.registerUserNotificationSettings(
+                // the success callback which will immediately return (APNs is not contacted for this)
+                success,
+                // called in case the configuration is incorrect
+                error, {
+                    // asking permission for these features
+                    types: notificationTypes,
+                    // register these categories
+                    categories: categories
+                }
+            );
+        },
+
+        //Initializes the push functionality on the device.
+        _initialize: function (success, error) {
+            var self = this;
+
+            if (this.isInitializing) {
+                error(new EverliveError('Push notifications are currently initializing.'));
+                return;
+            }
+
+            if (!this.emulatorMode && (!window.navigator || !window.navigator.globalization)) {
+                error(new EverliveError('The globalization plugin is not initialized.'));
+                return;
+            }
+
+            if (!this.emulatorMode && (!window.plugins || !window.plugins.pushNotification)) {
+                error(new EverliveError('The push notifications plugin is not initialized.'));
+                return;
+            }
+
+            this._initSuccessCallback = success;
+            this._initErrorCallback = error;
+
+            if (this.isInitialized) {
+                this._deviceRegistrationSuccess(this.pushToken);
+                return;
+            }
+
+            if (this.emulatorMode) {
+                setTimeout(
+                    function () {
+                        self._deviceRegistrationSuccess('fake_push_token');
+                    },
+                    1000
+                );
+                return;
+            }
+
+            this.isInitializing = true;
+
+            var suffix = this._globalFunctionSuffix;
+            if (!suffix) {
+                suffix = Date.now().toString();
+                this._globalFunctionSuffix = suffix;
+            }
+
+            var pushNotification = window.plugins.pushNotification;
+
+            var platformType = this._getPlatformType();
+            if (platformType === Platform.iOS) {
+                //Initialize global APN callback
+                var apnCallbackName = 'apnCallback_' + suffix;
+                Everlive.PushCallbacks[apnCallbackName] = _.bind(this._onNotificationAPN, this);
+
+                //Construct registration options object and validate iOS settings
+                var apnRegistrationOptions = this.pushSettings.iOS;
+                apnRegistrationOptions.ecb = 'Everlive.PushCallbacks.' + apnCallbackName;
+
+                //Register for APN
+                pushNotification.register(
+                    _.bind(this._successfulRegistrationAPN, this),
+                    _.bind(this._failedRegistrationAPN, this),
+                    apnRegistrationOptions
+                );
+            } else if (platformType === Platform.Android) {
+                //Initialize global GCM callback
+                var gcmCallbackName = 'gcmCallback_' + suffix;
+                Everlive.PushCallbacks[gcmCallbackName] = _.bind(this._onNotificationGCM, this);
+
+                //Construct registration options object and validate the Android settings
+                var gcmRegistrationOptions = this.pushSettings.android;
+                this._validateAndroidSettings(gcmRegistrationOptions);
+                gcmRegistrationOptions.ecb = 'Everlive.PushCallbacks.' + gcmCallbackName;
+
+                //Register for GCM
+                pushNotification.register(
+                    _.bind(this._successSentRegistrationGCM, this),
+                    _.bind(this._errorSentRegistrationGCM, this),
+                    gcmRegistrationOptions
+                );
+            } else if (platformType === Platform.WindowsPhone) {
+                //Initialize global WP8 callbacks.
+                var wp8CallbackName = 'wp8Callback_' + suffix;
+                var wp8RegistrationSuccessCallbackName = 'wp8RegistrationSuccessCallback_' + suffix;
+                var wp8RegistrationErrorCallbackName = 'wp8RegistrationErrorCallback_' + suffix;
+
+                Everlive.PushCallbacks[wp8CallbackName] = _.bind(this._onNotificationWP8, this);
+                Everlive.PushCallbacks[wp8RegistrationSuccessCallbackName] = _.bind(this._deviceRegistrationSuccessWP, this);
+                Everlive.PushCallbacks[wp8RegistrationErrorCallbackName] = _.bind(this._deviceRegistrationFailed, this);
+
+                //Construct registration options object and validate the WP8  settings
+                var wp8RegistrationOptions = this.pushSettings.wp8;
+                this._validateWP8Settings(wp8RegistrationOptions);
+                wp8RegistrationOptions.ecb = 'Everlive.PushCallbacks.' + wp8CallbackName;
+                wp8RegistrationOptions.uccb = 'Everlive.PushCallbacks.' + wp8RegistrationSuccessCallbackName;
+                wp8RegistrationOptions.errcb = 'Everlive.PushCallbacks.' + wp8RegistrationErrorCallbackName;
+
+
+                pushNotification.register(
+                    _.bind(this._successSentRegistrationWP8, this),
+                    _.bind(this._errorSentRegistrationWP8, this),
+                    wp8RegistrationOptions
+                );
+
+            } else {
+                throw new EverliveError('The current platform is not supported: ' + device.platform);
+            }
+        },
+
+        _deviceRegistrationSuccessWP: function (result) {
+            this._deviceRegistrationSuccess(result.uri);
+        },
+
+        _validateAndroidSettings: function (androidSettings) {
+            if (!androidSettings.senderID) {
+                throw new EverliveError('Sender ID (project number) is not set in the android settings.');
+            }
+        },
+
+        _validateWP8Settings: function (settings) {
+            if (!settings.channelName) {
+                throw new EverliveError('channelName is not set in the WP8 settings.');
+            }
+        },
+
+        _cleanPlatformsPushSettings: function (pushSettings) {
+            var cleanSettings = {};
+            pushSettings = pushSettings || {};
+
+            var addSettingsForPlatform = function addSettingsForPlatform(newSettingsObject, platform, allowedFields) {
+                if (!pushSettings[platform]) {
+                    return;
+                }
+
+                newSettingsObject[platform] = newSettingsObject[platform] || {};
+                var newPlatformSettings = pushSettings[platform];
+                var settings = newSettingsObject[platform];
+                _.each(allowedFields, function (allowedField) {
+                    if (newPlatformSettings.hasOwnProperty(allowedField)) {
+                        settings[allowedField] = newPlatformSettings[allowedField];
+                    }
+                });
+            };
+
+            addSettingsForPlatform(cleanSettings, 'iOS', ['badge', 'sound', 'alert', 'interactiveSettings']);
+            addSettingsForPlatform(cleanSettings, 'android', ['senderID', 'projectNumber']);
+            addSettingsForPlatform(cleanSettings, 'wp8', ['channelName']);
+
+            var callbackFields = ['notificationCallbackAndroid', 'notificationCallbackIOS', 'notificationCallbackWP8'];
+            _.each(callbackFields, function (callbackField) {
+                var callback = pushSettings[callbackField];
+                if (callback) {
+                    if (typeof callback !== 'function') {
+                        throw new EverliveError('The "' + callbackField + '" of the push settings should be a function');
+                    }
+
+                    cleanSettings[callbackField] = pushSettings[callbackField];
+                }
+            });
+
+            if (pushSettings.customParameters) {
+                cleanSettings.customParameters = pushSettings.customParameters;
+            }
+
+            return cleanSettings;
+        },
+
+        _populateRegistrationObject: function (deviceRegistration, success, error) {
+            var self = this;
+
+            return buildPromise(
+                function (success, error) {
+                    if (!self.pushToken) {
+                        throw new EverliveError('Push token is not available.');
+                    }
+
+                    self._getLocaleName(
+                        function (locale) {
+                            var deviceId = self._getDeviceId();
+                            var hardwareModel = device.model;
+                            var platformType = self._getPlatformType();
+                            var timeZone = jstz.determine().name();
+                            var pushToken = self.pushToken;
+                            var language = locale.value;
+                            var platformVersion = device.version;
+
+                            deviceRegistration.HardwareId = deviceId;
+                            deviceRegistration.HardwareModel = hardwareModel;
+                            deviceRegistration.PlatformType = platformType;
+                            deviceRegistration.PlatformVersion = platformVersion;
+                            deviceRegistration.TimeZone = timeZone;
+                            deviceRegistration.PushToken = pushToken;
+                            deviceRegistration.Locale = language;
+
+                            success();
+                        },
+                        error
+                    );
+                },
+                success,
+                error
+            );
+        },
+
+        _getLocaleName: function (success, error) {
+            if (this.emulatorMode) {
+                success({value: 'en_US'});
+            } else {
+                navigator.globalization.getLocaleName(
+                    function (locale) {
+                        success(locale);
+                    },
+                    error
+                );
+                navigator.globalization.getLocaleName(
+                    function (locale) {
+                    },
+                    error
+                );
+            }
+        },
+
+        _getDeviceId: function () {
+            return device.uuid;
+        },
+
+        //Returns the Everlive device platform constant given a value aquired from cordova's device.platform.
+        _getPlatformType: function () {
+            var psLower = device.platform.toLowerCase();
+            switch (psLower) {
+                case 'ios':
+                case 'iphone':
+                case 'ipad':
+                    return Platform.iOS;
+                case 'android':
+                    return Platform.Android;
+                case 'wince':
+                    return Platform.WindowsPhone;
+                case 'win32nt': // real wp8 devices return this string as platform identifier.
+                    return Platform.WindowsPhone;
+                default:
+                    return Platform.Unknown;
+            }
+        },
+
+        _deviceRegistrationFailed: function (error) {
+            this.pushToken = null;
+            this.isInitializing = false;
+            this.isInitialized = false;
+
+            if (this._initErrorCallback) {
+                this._initErrorCallback({error: error});
+            }
+        },
+
+        _deviceRegistrationSuccess: function (token) {
+            this.pushToken = token;
+            this.isInitializing = false;
+            this.isInitialized = true;
+
+            if (this._initSuccessCallback) {
+                this._initSuccessCallback({token: token});
+            }
+        },
+
+        //Occurs when the device registration in APN succeeds
+        _successfulRegistrationAPN: function (token) {
+            var self = this;
+            if (this.pushSettings.iOS && this.pushSettings.iOS.interactiveSettings) {
+                this._initializeInteractivePush(
+                    this.pushSettings.iOS,
+                    function () {
+                        self._deviceRegistrationSuccess(token);
+                    },
+                    function (err) {
+                        throw new EverliveError('The interactive push configuration is incorrect: ' + err);
+                    }
+                );
+            } else {
+                this._deviceRegistrationSuccess(token);
+            }
+        },
+
+        //Occurs if the device registration in APN fails
+        _failedRegistrationAPN: function (error) {
+            this._deviceRegistrationFailed(error);
+        },
+
+        //Occurs when device registration has been successfully sent to GCM
+        _successSentRegistrationGCM: function (id) {
+            //console.log("Successfully sent request for registering with GCM.");
+        },
+        //Occurs when device registration has been successfully sent for WP8
+        _successSentRegistrationWP8: function (id) {
+            //console.log("Successfully sent request for registering WP8 .");
+        },
+        //Occurs when an error occured when sending registration request for WP8
+        _errorSentRegistrationWP8: function (error) {
+            this._deviceRegistrationFailed(error);
+        },
+
+        //Occurs when an error occured when sending registration request to GCM
+        _errorSentRegistrationGCM: function (error) {
+            this._deviceRegistrationFailed(error);
+        },
+
+        //This function receives all notification events from APN
+        _onNotificationAPN: function (e) {
+            this._raiseNotificationEventIOS(e);
+        },
+        //This function receives all notification events for WP8
+        _onNotificationWP8: function (e) {
+            this._raiseNotificationEventWP8(e);
+        },
+
+        //This function receives all notification events from GCM
+        _onNotificationGCM: function onNotificationGCM(e) {
+            switch (e.event) {
+                case 'registered':
+                    if (e.regid.length > 0) {
+                        this._deviceRegistrationSuccess(e.regid);
+                    }
+                    break;
+                case 'message':
+                    this._raiseNotificationEventAndroid(e);
+                    break;
+                case 'error':
+                    if (!this.pushToken) {
+                        this._deviceRegistrationFailed(e);
+                    } else {
+                        this._raiseNotificationEventAndroid(e);
+                    }
+                    break;
+                default:
+                    this._raiseNotificationEventAndroid(e);
+                    break;
+            }
+        },
+
+        _raiseNotificationEventAndroid: function (e) {
+            if (this.pushSettings.notificationCallbackAndroid) {
+                this.pushSettings.notificationCallbackAndroid(e);
+            }
+        },
+        _raiseNotificationEventIOS: function (e) {
+            if (this.pushSettings.notificationCallbackIOS) {
+                this.pushSettings.notificationCallbackIOS(e);
+            }
+        },
+        _raiseNotificationEventWP8: function (e) {
+            if (this.pushSettings.notificationCallbackWP8) {
+                this.pushSettings.notificationCallbackWP8(e);
+            }
+        }
+    };
+
+    return CurrentDevice;
+}());
+
+},{"../EverliveError":47,"../common":58,"../constants":59,"../utils":99}],83:[function(require,module,exports){
+var platform = require('../everlive.platform');
 var _ = require('../common')._;
+
+'use strict';
+
+if (platform.isNativeScript) {
+	var NativeScriptCurrentDevice = require('./NativeScriptCurrentDevice');
+    module.exports = NativeScriptCurrentDevice;
+} else if (platform.isCordova || platform.isDesktop) {
+	var CordovaCurrentDevice = require('./CordovaCurrentDevice');
+    module.exports = CordovaCurrentDevice;
+} else {
+    module.exports = _.noop;
+}
+},{"../common":58,"../everlive.platform":61,"./CordovaCurrentDevice":82,"./NativeScriptCurrentDevice":84}],84:[function(require,module,exports){
+var buildPromise = require('../utils').buildPromise;
+var EverliveError = require('../EverliveError').EverliveError;
+var Platform = require('../constants').Platform;
+var common = require('../common');
+var jstz = common.jstz;
+var _ = common._;
+var tnsPushPlugin = require('nativescript-push-notifications');
+var tnsPlatform = require('platform');
+
+module.exports = (function () {
+    /**
+     * @class CurrentDevice
+     * @deprecated
+     * @protected
+     * @param pushHandler
+     * @constructor
+     */
+    var CurrentDevice = function (pushHandler) {
+        this._pushHandler = pushHandler;
+        this._initSuccessCallback = null;
+        this._initErrorCallback = null;
+
+        //Suffix for the global callback functions
+        this._globalFunctionSuffix = null;
+
+        this.pushSettings = null;
+        this.pushToken = null;
+        this.isInitialized = false;
+        this.isInitializing = false;
+
+        this.emulatorMode = false;
+    };
+
+    CurrentDevice.ensurePushIsAvailable = function() {
+        // NativeScript will throw an error when the TNS Push Plugin cannot be required. So this is actually unreachable.
+    };
+
+    CurrentDevice.prototype = {
+
+        /**
+         * Initializes the current device for push notifications. This method requests a push token from the device vendor and enables the push notification functionality on the device. Once this is done, you can register the device in {{site.TelerikBackendServices}} using the register() method.
+         * @method enableNotifications
+         * @name enableNotifications
+         * @memberOf CurrentDevice.prototype
+         * @param {PushSettings} pushSettings An object specifying various settings for the initialization.
+         * @returns {Object} The promise for the request.
+         */
+        /**
+         * Initializes the current device for push notifications. This method requests a push token from the device vendor and enables the push notification functionality on the device. Once this is done, you can register the device in Everlive using the register() method.
+         * @method enableNotifications
+         * @name enableNotifications
+         * @memberOf CurrentDevice.prototype
+         * @param {PushSettings} pushSettings An object specifying various settings for the initialization.
+         * @param {Function} [success] Callback to invoke on success.
+         * @param {Function} [error] Callback to invoke on error.
+         */
+        enableNotifications: function (pushSettings, success, error) {
+            this.pushSettings = this._cleanPlatformsPushSettings(pushSettings);
+
+            return buildPromise(_.bind(this._initialize, this), success, error);
+        },
+
+        /**
+         * Disables push notifications for the current device. This method invalidates any push tokens that were obtained for the device from the current application.
+         * @method disableNotifications
+         * @name disableNotifications
+         * @memberOf CurrentDevice.prototype
+         * @returns {Object} The promise for the request.
+         */
+        /**
+         * Disables push notifications for the current device. This method invalidates any push tokens that were obtained for the device from the current application.
+         * @method disableNotifications
+         * @name disableNotifications
+         * @memberOf CurrentDevice.prototype
+         * @param {Function} [success] Callback to invoke on success.
+         * @param {Function} [error] Callback to invoke on error.
+         */
+        disableNotifications: function (successCb, errorCb) {
+            var self = this;
+
+            return this.unregister().then(
+                function () {
+                    return buildPromise(
+                        function (success, error) {
+                            var successCallback = function successCallback() {
+                                    self.isInitialized = false;
+                                    success();
+                                };
+
+
+                            var platformType = self._getPlatformType();
+                            if(platformType === Platform.Android) {
+                                return tnsPushPlugin.unregister(successCallback, error, self.pushSettings.android);
+                            }
+
+                            tnsPushPlugin.unregister(successCallback, error);
+                        },
+                        successCb,
+                        errorCb
+                    );
+                },
+                errorCb
+            );
+        },
+
+        /**
+         * Returns the push registration for the current device.
+         * @memberOf CurrentDevice.prototype
+         * @method getRegistration
+         * @name getRegistration
+         * @returns {Object} The promise for the request.
+         */
+        /**
+         * Returns the push registration for the current device.
+         * @memberOf CurrentDevice.prototype
+         * @method getRegistration
+         * @name getRegistration
+         * @param {Function} success Callback to invoke on success.
+         * @param {Function} error Callback to invoke on error.
+         */
+        getRegistration: function (success, error) {
+            var deviceId = encodeURIComponent(this._getDeviceId());
+            return this._pushHandler.devices.getById('HardwareId/' + deviceId, success, error);
+        },
+
+        /**
+         * Registers the current device for push notifications in {{site.TelerikBackendServices}}. This method can be called only after [enableNotifications()]{@link currentDevice.enableNotifications} has completed successfully.
+         * @memberOf CurrentDevice.prototype
+         * @method register
+         * @name register
+         * @param {Object} customParameters Custom parameters for the registration.
+         * @returns {Object} The promise for the request.
+         */
+        /**
+         * Registers the current device for push notifications in {{site.TelerikBackendServices}}. This method can be called only after [enableNotifications()]{@link currentDevice.enableNotifications} has completed successfully.
+         * @memberOf CurrentDevice.prototype
+         * @method register
+         * @name register
+         * @param {Object} customParameters Custom parameters for the registration.
+         * @param {Function} [success] Callback to invoke on success.
+         * @param {Function} [error] Callback to invoke on error.
+         */
+        register: function (customParameters, success, error) {
+            var self = this;
+
+            var deviceRegistration = {};
+            if (customParameters !== undefined) {
+                deviceRegistration.Parameters = customParameters;
+            }
+
+            return this._populateRegistrationObject(deviceRegistration).then(
+                function () {
+                    return self._pushHandler.devices.create(deviceRegistration, success, error);
+                },
+                error
+            );
+        },
+
+        /**
+         * Unregisters the current device from push notifications in {{site.TelerikBackendServices}}. After this call completes successfully, {{site.bs}} will no longer send notifications to this device. Note that this does not prevent the device from receiving notifications and does not invalidate push tokens.
+         * @memberOf CurrentDevice.prototype
+         * @method unregister
+         * @name unregister
+         * @returns {Object} The promise for the request.
+         */
+        /**
+         * Unregisters the current device from push notifications in {{site.TelerikBackendServices}}. After this call completes successfully, {{site.bs}} will no longer send notifications to this device. Note that this does not prevent the device from receiving notifications and does not invalidate push tokens.
+         * @memberOf CurrentDevice.prototype
+         * @method unregister
+         * @name unregister
+         * @param {Function} [success] Callback to invoke on success.
+         * @param {Function} [error] Callback to invoke on error.
+         */
+        unregister: function (success, error) {
+            var deviceId = encodeURIComponent(this._getDeviceId());
+            return this._pushHandler.devices.destroySingle({Id: 'HardwareId/' + deviceId}, success, error);
+        },
+
+        /**
+         * Updates the registration of the current device.
+         * @memberOf CurrentDevice.prototype
+         * @method updateRegistration
+         * @name updateRegistration
+         * @param {Object} customParameters Custom parameters for the registration. If undefined, customParameters are not updated.
+         * @returns {Object} The promise for the request.
+         */
+        /**
+         * Updates the registration for the current device.
+         * @memberOf CurrentDevice.prototype
+         * @method updateRegistration
+         * @name updateRegistration
+         * @param {Object} customParameters Custom parameters for the registration. If undefined, customParameters are not updated.
+         * @param {Function} [success] Callback to invoke on success.
+         * @param {Function} [error] Callback to invoke on error.
+         */
+        updateRegistration: function (customParameters, success, error) {
+            var self = this;
+
+            var deviceRegistration = {};
+            if (customParameters !== undefined) {
+                deviceRegistration.Parameters = customParameters;
+            }
+
+            return this._populateRegistrationObject(deviceRegistration).then(
+                function () {
+                    deviceRegistration.Id = 'HardwareId/' + encodeURIComponent(deviceRegistration.HardwareId);
+                    return self._pushHandler.devices.updateSingle(deviceRegistration, success, error);
+                },
+                error
+            );
+        },
+
+        /**
+         * This method provides a different operation on each supported platform:
+         *
+         * - On iOS: Checks if Notifications is enabled for this application in the device's Notification Center.
+         * - On Windows Phone: Checks if the application has an active open channel for communication with the Microsoft Push Notification Service. The outcome does not depend on the device's notification settings.
+         * - On Android: Checks if the application has established a connection with Google Cloud Messaging. The outcome does not depend on the device's notification settings.
+         * @method areNotificationsEnabled
+         * @name areNotificationsEnabled
+         * @memberOf Push.prototype
+         * @param {Object} options An object passed to the Push Notification plugin's areNotificationsEnabled method
+         * @returns {Promise} The promise for the request.
+         */
+        /**
+         * iOS: Checks if the Notifications are enabled for this Application in the Device's Notification Center.
+         * Windows Phone: Checks if the Application has an active opened Channel for communication with the Notification Service. Not relying on the device notification settings.
+         * Android: Checks if the Application has established connection with the Notification Service. Not relying on the device notification settings.
+         * @method areNotificationsEnabled
+         * @name areNotificationsEnabled
+         * @memberOf Push.prototype
+         * @param {Object} options an object passed to the Push Notification plugin's areNotificationsEnabled method.
+         * @param {Function} [onSuccess] Callback to invoke on successful check. Passes a single boolean value: true or false.
+         * @param {Function} [onError] Callback to invoke when an error in the push plugin has occurred.
+         */
+        areNotificationsEnabled: function (options, onSuccess, onError) {
+            options = options || {};
+            
+            return buildPromise(function (successCb, errorCb) {
+                tnsPushPlugin.areNotificationsEnabled(successCb, errorCb, options);
+            }, onSuccess, onError);
+        },
+
+        _initializeInteractivePush: function (iOSSettings, success, error) {
+            tnsPushPlugin.registerUserNotificationSettings(
+                // the success callback which will immediately return (APNs is not contacted for this)
+                success,
+                // called in case the configuration is incorrect
+                error
+            );
+        },
+
+        //Initializes the push functionality on the device.
+        _initialize: function (success, error) {
+            if (this.isInitializing) {
+                error(new EverliveError('Push notifications are currently initializing.'));
+                return;
+            }
+
+            this._initSuccessCallback = success;
+            this._initErrorCallback = error;
+
+            if (this.isInitialized) {
+                this._deviceRegistrationSuccess(this.pushToken);
+                return;
+            }
+
+            this.isInitializing = true;
+
+            var suffix = this._globalFunctionSuffix;
+            if (!suffix) {
+                suffix = Date.now().toString();
+                this._globalFunctionSuffix = suffix;
+            }
+
+            var platformType = this._getPlatformType();
+            if (platformType === Platform.iOS) {
+                //Construct registration options object and validate iOS settings
+                var apnRegistrationOptions = this.pushSettings.iOS;
+
+                apnRegistrationOptions.notificationCallbackIOS = this.pushSettings.notificationCallbackIOS;
+                //Register for APN
+                tnsPushPlugin.register(
+                    apnRegistrationOptions,
+                    _.bind(this._successfulRegistrationAPN, this),
+                    _.bind(this._failedRegistrationAPN, this)                    
+                );
+            } else if (platformType === Platform.Android) {
+                // Ensure the required fields are present in the Android Settings
+                var gcmRegistrationOptions = this.pushSettings.android;
+                this._validateAndroidSettings(gcmRegistrationOptions);
+
+                gcmRegistrationOptions.notificationCallbackAndroid = this.pushSettings.notificationCallbackAndroid;
+
+                //Register for GCM
+                tnsPushPlugin.register(
+                    gcmRegistrationOptions,
+                    _.bind(this._successSentRegistrationGCM, this),
+                    _.bind(this._errorSentRegistrationGCM, this)
+                );
+            } else {
+                throw new EverliveError('The current platform is not supported: ' + tnsPlatform.device.os);
+            }
+        },
+
+        _validateAndroidSettings: function (androidSettings) {
+            if (!androidSettings.senderID) {
+                throw new EverliveError('Sender ID (project number) is not set in the android settings.');
+            }
+        },
+        _cleanPlatformsPushSettings: function (pushSettings) {
+            var cleanSettings = {};
+            pushSettings = pushSettings || {};
+
+            var addSettingsForPlatform = function addSettingsForPlatform(newSettingsObject, platform, allowedFields) {
+                if (!pushSettings[platform]) {
+                    return;
+                }
+
+                newSettingsObject[platform] = newSettingsObject[platform] || {};
+                var newPlatformSettings = pushSettings[platform];
+                var settings = newSettingsObject[platform];
+                _.each(allowedFields, function (allowedField) {
+                    if (newPlatformSettings.hasOwnProperty(allowedField)) {
+                        settings[allowedField] = newPlatformSettings[allowedField];
+                    }
+                });
+            };
+
+            addSettingsForPlatform(cleanSettings, 'iOS', ['badge', 'sound', 'alert', 'interactiveSettings']);
+            addSettingsForPlatform(cleanSettings, 'android', ['senderID', 'projectNumber']);
+
+            var callbackFields = ['notificationCallbackAndroid', 'notificationCallbackIOS'];
+            _.each(callbackFields, function (callbackField) {
+                var callback = pushSettings[callbackField];
+                if (callback) {
+                    if (typeof callback !== 'function') {
+                        throw new EverliveError('The "' + callbackField + '" of the push settings should be a function');
+                    }
+
+                    cleanSettings[callbackField] = pushSettings[callbackField];
+                }
+            });
+
+            if (pushSettings.customParameters) {
+                cleanSettings.customParameters = pushSettings.customParameters;
+            }
+
+            return cleanSettings;
+        },
+
+        _populateRegistrationObject: function (deviceRegistration, success, error) {
+            var self = this;
+
+            return buildPromise(
+                function (success, error) {
+                    if (!self.pushToken) {
+                        throw new EverliveError('Push token is not available.');
+                    }
+
+                    self._getLocaleName(
+                        function (locale) {
+                            var deviceId = self._getDeviceId();
+                            var hardwareModel = tnsPlatform.device.model;
+                            var platformType = self._getPlatformType();
+                            var timeZone = jstz.determine().name();
+                            var pushToken = self.pushToken;
+                            var language = 'en_US'; //TODO
+                            var platformVersion = tnsPlatform.device.osVersion;
+
+                            deviceRegistration.HardwareId = deviceId;
+                            deviceRegistration.HardwareModel = hardwareModel;
+                            deviceRegistration.PlatformType = platformType;
+                            deviceRegistration.PlatformVersion = platformVersion;
+                            deviceRegistration.TimeZone = timeZone;
+                            deviceRegistration.PushToken = pushToken;
+                            deviceRegistration.Locale = language;
+
+                            success();
+                        },
+                        error
+                    );
+                },
+                success,
+                error
+            );
+        },
+
+        _getLocaleName: function (success, error) {
+            return success(); // TODO            
+            /* TODO: Must translate somehow to NativeScript to get the current locale
+            if (this.emulatorMode) {
+                success({value: 'en_US'});
+            } else {
+                navigator.globalization.getLocaleName(
+                    function (locale) {
+                        success(locale);
+                    },
+                    error
+                );
+                navigator.globalization.getLocaleName(
+                    function (locale) {
+                    },
+                    error
+                );
+            }*/
+        },
+
+        _getDeviceId: function () {
+            return tnsPlatform.device.uuid;
+        },
+
+        //Returns the Everlive device platform constant given a value aquired from cordova's device.platform.
+        _getPlatformType: function () {
+            var psLower = tnsPlatform.device.os.toLowerCase();
+            switch (psLower) {
+                case 'ios':
+                case 'iphone':
+                case 'ipad':
+                    return Platform.iOS;
+                case 'android':
+                    return Platform.Android;
+                default:
+                    return Platform.Unknown;
+            }
+        },
+
+        _deviceRegistrationFailed: function (error) {
+            this.pushToken = null;
+            this.isInitializing = false;
+            this.isInitialized = false;
+
+            if (this._initErrorCallback) {
+                this._initErrorCallback({error: error});
+            }
+        },
+
+        _deviceRegistrationSuccess: function (token) {
+            this.pushToken = token;
+            this.isInitializing = false;
+            this.isInitialized = true;
+
+            if (this._initSuccessCallback) {
+                this._initSuccessCallback({token: token});
+            }
+        },
+
+        //Occurs when the device registration in APN succeeds
+        _successfulRegistrationAPN: function (token) {
+            var self = this;
+            if (this.pushSettings.iOS && this.pushSettings.iOS.interactiveSettings) {
+                this._initializeInteractivePush(
+                    this.pushSettings.iOS,
+                    function () {
+                        self._deviceRegistrationSuccess(token);
+                    },
+                    function (err) {
+                        throw new EverliveError('The interactive push configuration is incorrect: ' + err);
+                    }
+                );
+            } else {
+                this._deviceRegistrationSuccess(token);
+            }
+        },
+
+        //Occurs if the device registration in APN fails
+        _failedRegistrationAPN: function (error) {
+            this._deviceRegistrationFailed(error);
+        },
+
+        //Occurs when device registration has been successfully sent to GCM
+        _successSentRegistrationGCM: function (token) {
+            //console.log("Successfully sent request for registering with GCM.");
+
+            // set on message received.
+            tnsPushPlugin.onMessageReceived(this.pushSettings.notificationCallbackAndroid);
+
+            this._deviceRegistrationSuccess(token);
+        },
+
+        //Occurs when an error occured when sending registration request to GCM
+        _errorSentRegistrationGCM: function (error) {
+            this._deviceRegistrationFailed(error);
+        },
+
+        //This function receives all notification events from APN
+        _onNotificationAPN: function (e) {
+            this._raiseNotificationEventIOS(e);
+        },
+
+        //This function receives all notification events from GCM
+        _onNotificationGCM: function onNotificationGCM(e) {
+            switch (e.event) {
+                case 'registered':
+                    if (e.regid.length > 0) {
+                        this._deviceRegistrationSuccess(e.regid);
+                    }
+                    break;
+                case 'message':
+                    this._raiseNotificationEventAndroid(e);
+                    break;
+                case 'error':
+                    if (!this.pushToken) {
+                        this._deviceRegistrationFailed(e);
+                    } else {
+                        this._raiseNotificationEventAndroid(e);
+                    }
+                    break;
+                default:
+                    this._raiseNotificationEventAndroid(e);
+                    break;
+            }
+        },
+
+        _raiseNotificationEventAndroid: function (e) {
+            if (this.pushSettings.notificationCallbackAndroid) {
+                this.pushSettings.notificationCallbackAndroid(e);
+            }
+        },
+        _raiseNotificationEventIOS: function (e) {
+            if (this.pushSettings.notificationCallbackIOS) {
+                this.pushSettings.notificationCallbackIOS(e);
+            }
+        }
+    };
+
+    return CurrentDevice;
+}());
+
+},{"../EverliveError":47,"../common":58,"../constants":59,"../utils":99,"nativescript-push-notifications":"nativescript-push-notifications","platform":"platform"}],85:[function(require,module,exports){
+var _ = require('../common')._;
+var constants = require('../constants');
+var Query = require('../query/Query');
+var Headers = constants.Headers;
 
 module.exports = (function () {
     // TODO: [offline] Update the structure - filter field can be refactored for example and a skip/limit/sort property can be added
@@ -22680,17 +24345,20 @@ module.exports = (function () {
     };
 
     DataQuery.prototype = {
-        getHeader: function (header) {
+        _normalizeHeaders: function () {
             var self = this;
             var headerKeys = Object.keys(this.headers);
 
+            this._normalizedHeaders = {};
+            _.each(headerKeys, function (headerKey) {
+                var normalizedKey = headerKey.toLowerCase();
+                self._normalizedHeaders[normalizedKey] = self.headers[headerKey];
+            });
+        },
+
+        getHeader: function (header) {
             if (!this._normalizedHeaders) {
-                this._normalizedHeaders = {};
-                _.each(headerKeys, function (headerKey) {
-                    var normalizedKey = headerKey.toLowerCase();
-                    var headerValue = self.headers[headerKey];
-                    self._normalizedHeaders[normalizedKey] = headerValue;
-                });
+                this._normalizeHeaders();
             }
 
             var normalizedHeader = header.toLowerCase();
@@ -22698,6 +24366,10 @@ module.exports = (function () {
         },
 
         getHeaderAsJSON: function (header) {
+            if (!this._normalizedHeaders) {
+                this._normalizeHeaders();
+            }
+
             var headerValue = this._normalizedHeaders[header.toLowerCase()];
             if (_.isObject(headerValue)) {
                 return headerValue;
@@ -22711,6 +24383,41 @@ module.exports = (function () {
             } else {
                 return headerValue;
             }
+        },
+
+        getQueryParameters: function () {
+            var queryParams = {};
+
+            if (this.operation === DataQuery.operations.readById) {
+                queryParams.filter = this.additionalOptions.id;
+                queryParams.expand = this.getHeaderAsJSON(Headers.expand);
+            } else {
+                var sort = this.getHeaderAsJSON(Headers.sort);
+                var limit = this.getHeaderAsJSON(Headers.take);
+                var skip = this.getHeaderAsJSON(Headers.skip);
+                var select = this.getHeaderAsJSON(Headers.select);
+                var filter = this.getHeaderAsJSON(Headers.filter);
+                var expand = this.getHeaderAsJSON(Headers.expand);
+
+                if (this.filter instanceof Query) {
+                    var filterObj = this.filter.build();
+                    queryParams.filter = filterObj.$where || filter || {};
+                    queryParams.sort = filterObj.$sort || sort;
+                    queryParams.limit = filterObj.$take || limit;
+                    queryParams.skip = filterObj.$skip || skip;
+                    queryParams.select = filterObj.$select || select;
+                    queryParams.expand = filterObj.$expand || expand;
+                } else {
+                    queryParams.filter = (this.filter || filter) || {};
+                    queryParams.sort = sort;
+                    queryParams.limit = limit;
+                    queryParams.skip = skip;
+                    queryParams.select = select;
+                    queryParams.expand = expand;
+                }
+            }
+
+            return queryParams;
         }
     };
 
@@ -22731,13 +24438,15 @@ module.exports = (function () {
         userLoginWithProvider: 'loginWith',
         userLinkWithProvider: 'linkWith',
         userUnlinkFromProvider: 'unlinkFrom',
+        userResetPassword: 'resetPassword',
+        userSetPassword: 'setPassword',
         filesUpdateContent: 'updateContent',
         filesGetDownloadUrlById: 'downloadUrlById'
     };
 
     return DataQuery;
 }());
-},{"../common":53}],74:[function(require,module,exports){
+},{"../common":58,"../constants":59,"../query/Query":86}],86:[function(require,module,exports){
 var Expression = require('../Expression');
 var OperatorType = require('../constants').OperatorType;
 var WhereQuery = require('./WhereQuery');
@@ -22863,7 +24572,7 @@ module.exports = (function () {
 
     return Query;
 }());
-},{"../Expression":46,"../constants":54,"./QueryBuilder":75,"./WhereQuery":77}],75:[function(require,module,exports){
+},{"../Expression":49,"../constants":59,"./QueryBuilder":87,"./WhereQuery":89}],87:[function(require,module,exports){
 var constants = require('../constants');
 var OperatorType = constants.OperatorType;
 var _ = require('../common')._;
@@ -23213,7 +24922,7 @@ module.exports = (function () {
 
     return QueryBuilder;
 }());
-},{"../EverliveError":44,"../Expression":46,"../GeoPoint":47,"../common":53,"../constants":54}],76:[function(require,module,exports){
+},{"../EverliveError":47,"../Expression":49,"../GeoPoint":50,"../common":58,"../constants":59}],88:[function(require,module,exports){
 var DataQuery = require('./DataQuery');
 var Request = require('../Request');
 var _ = require('../common')._;
@@ -23401,6 +25110,20 @@ module.exports = (function () {
         });
     };
 
+    RequestOptionsBuilder[DataQuery.operations.userResetPassword] = function (dataQuery) {
+        return RequestOptionsBuilder._build(dataQuery, {
+            method: 'POST',
+            endpoint: RequestOptionsBuilder._buildEndpointUrl(dataQuery) + '/resetpassword'
+        });
+    };
+
+    RequestOptionsBuilder[DataQuery.operations.userSetPassword] = function (dataQuery) {
+        return RequestOptionsBuilder._build(dataQuery, {
+            method: 'POST',
+            endpoint: RequestOptionsBuilder._buildEndpointUrl(dataQuery) + '/setpassword'
+        });
+    };
+
     RequestOptionsBuilder[DataQuery.operations.filesUpdateContent] = function (dataQuery) {
         return RequestOptionsBuilder._build(dataQuery, {
             method: 'PUT',
@@ -23416,7 +25139,7 @@ module.exports = (function () {
 
     return RequestOptionsBuilder;
 }());
-},{"../Request":49,"../common":53,"./DataQuery":73}],77:[function(require,module,exports){
+},{"../Request":52,"../common":58,"./DataQuery":85}],89:[function(require,module,exports){
 var Expression = require('../Expression');
 var OperatorType = require('../constants').OperatorType;
 
@@ -23712,7 +25435,7 @@ module.exports = (function () {
 
     return WhereQuery;
 }());
-},{"../Expression":46,"../constants":54}],78:[function(require,module,exports){
+},{"../Expression":49,"../constants":59}],90:[function(require,module,exports){
 var http = require('http');
 module.exports = (function () {
     'use strict';
@@ -23762,7 +25485,7 @@ module.exports = (function () {
 
     return reqwest;
 }());
-},{"http":"http"}],79:[function(require,module,exports){
+},{"http":"http"}],91:[function(require,module,exports){
 (function (Buffer){
 var url = require('url');
 var http = require('http');
@@ -23856,8 +25579,7 @@ module.exports = (function () {
     return reqwest;
 }());
 }).call(this,require("buffer").Buffer)
-
-},{"buffer":"buffer","http":"http","https":"https","rsvp":31,"underscore":32,"url":"url","zlib":"zlib"}],80:[function(require,module,exports){
+},{"buffer":"buffer","http":"http","https":"https","rsvp":34,"underscore":35,"url":"url","zlib":"zlib"}],92:[function(require,module,exports){
 var platform = require('../everlive.platform');
 var WebFileStore = require('./WebFileStore');
 var NativeScriptFileStore = require('./NativeScriptFileStore');
@@ -23872,7 +25594,7 @@ if (platform.isNativeScript) {
 } else {
     module.exports = _.noop;
 }
-},{"../common":53,"../everlive.platform":56,"./NativeScriptFileStore":82,"./WebFileStore":83}],81:[function(require,module,exports){
+},{"../common":58,"../everlive.platform":61,"./NativeScriptFileStore":94,"./WebFileStore":95}],93:[function(require,module,exports){
 var platform = require('./../everlive.platform.js');
 var isNativeScript = platform.isNativeScript;
 var isNodejs = platform.isNodejs;
@@ -23951,7 +25673,7 @@ module.exports = (function () {
 
     return LocalStore;
 }());
-},{"./../constants":54,"./../everlive.platform.js":56,"application-settings":"application-settings","local-settings":"local-settings","node-localstorage":"node-localstorage"}],82:[function(require,module,exports){
+},{"./../constants":59,"./../everlive.platform.js":61,"application-settings":"application-settings","local-settings":"local-settings","node-localstorage":"node-localstorage"}],94:[function(require,module,exports){
 'use strict';
 
 var common = require('../common');
@@ -24055,7 +25777,7 @@ NativeScriptFileStore.prototype = {
 };
 
 module.exports = NativeScriptFileStore;
-},{"../common":53,"file-system":"file-system"}],83:[function(require,module,exports){
+},{"../common":58,"file-system":"file-system"}],95:[function(require,module,exports){
 'use strict';
 
 var EverliveError = require('../EverliveError').EverliveError;
@@ -24065,24 +25787,37 @@ var utils = require('../utils');
 var platform = require('../everlive.platform');
 var path = require('path');
 
+var deviceReadyPromise = function () {
+    return new rsvp.Promise(function (resolve) {
+        document.addEventListener('deviceready', resolve);
+    });
+};
+
 function WebFileStore(storagePath, options) {
     this.options = options;
 
     var filesDirectoryPath;
+
     if (platform.isWindowsPhone) {
-        filesDirectoryPath = '/' + storagePath;
+        //windows phone does not handle leading or trailing slashes very well :(
+        filesDirectoryPath = storagePath.replace(new RegExp('/', 'g'), '');
     } else {
-        filesDirectoryPath = storagePath + '/';
+        if (storagePath.lastIndexOf('/') === -1) {
+            filesDirectoryPath = storagePath + '/';
+        }
     }
+
+    filesDirectoryPath = filesDirectoryPath || storagePath;
 
     var self = this;
 
-    document.addEventListener('deviceready', function () {
-        self.filesDirectoryPath = filesDirectoryPath;
-        self._requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
-        self._resolveLocalFileSystemURL = window.resolveLocalFileSystemURL || window.webkitResolveLocalFileSystemURL;
-        self._PERSISTENT_FILE_SYSTEM = window.LocalFileSystem ? window.LocalFileSystem.PERSISTENT : window.PERSISTENT;
-    })
+    deviceReadyPromise()
+        .then(function () {
+            self.filesDirectoryPath = filesDirectoryPath;
+            self._requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
+            self._resolveLocalFileSystemURL = window.resolveLocalFileSystemURL || window.webkitResolveLocalFileSystemURL;
+            self._PERSISTENT_FILE_SYSTEM = window.LocalFileSystem ? window.LocalFileSystem.PERSISTENT : window.PERSISTENT;
+        });
 }
 
 WebFileStore.prototype = {
@@ -24109,32 +25844,36 @@ WebFileStore.prototype = {
 
         return function getDataDirectory() {
             var self = this;
-            var requestFileSystem = function (bytes, success, error) {
-                self._requestFileSystem.call(window, self._PERSISTENT_FILE_SYSTEM, bytes, function (fileSystem) {
-                    fileSystemRoot = fileSystem.root;
-                    fileSystemRoot.nativeURL = fileSystemRoot.nativeURL || fileSystemRoot.toURL();
-                    success(fileSystemRoot);
-                }, error);
-            };
 
-            return new rsvp.Promise(function (resolve, reject) {
-                if (fileSystemRoot) {
-                    return resolve(fileSystemRoot);
-                }
+            return deviceReadyPromise()
+                .then(function () {
+                    var requestFileSystem = function (bytes, success, error) {
+                        self._requestFileSystem.call(window, self._PERSISTENT_FILE_SYSTEM, bytes, function (fileSystem) {
+                            fileSystemRoot = fileSystem.root;
+                            fileSystemRoot.nativeURL = fileSystemRoot.nativeURL || fileSystemRoot.toURL();
+                            success(fileSystemRoot);
+                        }, error);
+                    };
 
-                if (platform.isDesktop) {
-                    if (navigator && !navigator.webkitPersistentStorage) {
-                        return reject(new EverliveError('FileSystemStorage can be used only with browsers supporting it. Consider using localStorage.'))
-                    }
+                    return new rsvp.Promise(function (resolve, reject) {
+                        if (fileSystemRoot) {
+                            return resolve(fileSystemRoot);
+                        }
 
-                    navigator.webkitPersistentStorage.requestQuota(self.options.storage.requestedQuota, function (grantedBytes) {
-                        requestFileSystem(grantedBytes, resolve, reject);
-                    }, reject);
-                } else {
-                    requestFileSystem(0, resolve, reject);
-                }
-            });
-        }
+                        if (platform.isDesktop) {
+                            if (navigator && !navigator.webkitPersistentStorage) {
+                                return reject(new EverliveError('FileSystemStorage can be used only with browsers supporting it. Consider using localStorage.'))
+                            }
+
+                            navigator.webkitPersistentStorage.requestQuota(self.options.storage.requestedQuota, function (grantedBytes) {
+                                requestFileSystem(grantedBytes, resolve, reject);
+                            }, reject);
+                        } else {
+                            requestFileSystem(0, resolve, reject);
+                        }
+                    });
+                });
+        };
     }()),
 
     getFilesDirectory: function getFilesDirectory() {
@@ -24338,17 +26077,20 @@ WebFileStore.prototype = {
 };
 
 module.exports = WebFileStore;
-},{"../EverliveError":44,"../common":53,"../everlive.platform":56,"../utils":87,"path":4}],84:[function(require,module,exports){
+},{"../EverliveError":47,"../common":58,"../everlive.platform":61,"../utils":99,"path":3}],96:[function(require,module,exports){
 var buildPromise = require('../utils').buildPromise;
+var constants = require('../constants');
+var idField = constants.idField;
 var DataQuery = require('../query/DataQuery');
 var RequestOptionsBuilder = require('../query/RequestOptionsBuilder');
 var rsvp = require('../common').rsvp;
 var Request = require('../Request');
-var idField = require('../constants').idField;
 var Everlive = require('../Everlive');
 var EverliveError = require('../EverliveError').EverliveError;
 var EverliveErrors = require('../EverliveError').EverliveErrors;
+var everlivePlatform = require('../everlive.platform').platform;
 var _ = require('../common')._;
+var utils = require('../utils');
 
 module.exports = (function () {
     function mergeResultData(data, success) {
@@ -24390,7 +26132,6 @@ module.exports = (function () {
         this.offlineStorage = offlineStorage;
         this.everlive = everlive;
     }
-
 
     Data.prototype = {
         _isOnline: function () {
@@ -24462,7 +26203,7 @@ module.exports = (function () {
          * Modifies whether the query should be invoked on the offline storage.
          * Default is true.
          * Only valid when offlineStorage is enabled.
-         * @param workOffline
+         * @param useOffline
          * @returns {Data}
          * */
         useOffline: function (useOffline) {
@@ -24470,6 +26211,44 @@ module.exports = (function () {
                 throw new Error('A single value is expected in useOffline() query modifier');
             }
             return this._setOption('useOffline', useOffline);
+        },
+
+        /**
+         * @memberOf Data.prototype
+         * @method
+         * @name ignoreCache
+         * Does not use the cache when retrieving the data.
+         * Only valid when caching is enabled.
+         * @returns {Data}
+         * */
+        ignoreCache: function () {
+            return this._setOption('ignoreCache', true);
+        },
+
+        /**
+         * @memberOf Data.prototype
+         * @method
+         * @name forceCache
+         * Forces the request to get the data from the cache even if the data is already expired.
+         * Only valid when caching is enabled.
+         * @returns {Data}
+         * */
+        forceCache: function () {
+            return this._setOption('forceCache', true);
+        },
+
+        /**
+         * @memberOf Data.prototype
+         * @method
+         * @name maxAge
+         * Sets cache expiration specifically for the current query
+         * Only valid when caching is enabled.
+         * @param maxAgeInMinutes
+         * @returns {Data}
+         * */
+        maxAge: function (maxAgeInMinutes) {
+            var maxAge = maxAgeInMinutes * 1000 * 60;
+            return this._setOption('maxAge', maxAge);
         },
 
         isSync: function (isSync) {
@@ -24535,6 +26314,76 @@ module.exports = (function () {
             return this.withHeaders(expandHeader);
         },
 
+        _applyQueryOffline: function (query) {
+            var self = this;
+
+            if (!query.applyOffline) {
+                query.onError.call(this, new EverliveError('The applyOffline must be false when working offline.'));
+            } else {
+                self.offlineStorage.processQuery(query)
+                    .then(function () {
+                        query.onSuccess.apply(this, arguments);
+                    }, function (err) {
+                        if (!err.code) {
+                            err = new EverliveError(err.message, EverliveErrors.generalDatabaseError.code);
+                        }
+                        query.onError.call(this, err);
+                    });
+            }
+        },
+
+        _sendRequest: function (query, online) {
+            var self = this;
+
+            var originalSuccess = query.onSuccess;
+            query.onSuccess = function () {
+                var args = arguments;
+                var data = args[0];
+
+                if (query.applyOffline) {
+                    return self._applyOffline(query, data)
+                        .then(function () {
+                            originalSuccess.apply(this, args);
+                        }, function (err) {
+                            if (online && err.code === EverliveErrors.operationNotSupportedOffline.code) {
+                                originalSuccess.apply(this, args);
+                            } else {
+                                query.onError.apply(this, arguments);
+                            }
+                        });
+                } else {
+                    return originalSuccess.apply(this, args);
+                }
+            };
+
+            var getRequestOptionsFromQuery = RequestOptionsBuilder[query.operation];
+            var requestOptions = getRequestOptionsFromQuery(query);
+            this._setAdditionalHeaders(query, requestOptions);
+            var request = new Request(this.setup, requestOptions);
+            request.send();
+        },
+
+        _applyQueryOnline: function (query) {
+            if (query.useCache) {
+                this.everlive.cache._cacheDataQuery(query);
+            } else {
+                this._sendRequest(query, true);
+            }
+        },
+
+        _setAdditionalHeaders: function (query, requestOptions) {
+            if (query.isSync) {
+                requestOptions.headers[constants.Headers.sync] = true;
+            }
+
+            var sdkHeaderValue = {
+                sdk: 'js',
+                platform: everlivePlatform
+            };
+
+            requestOptions.headers[constants.Headers.sdk] = JSON.stringify(sdkHeaderValue);
+        },
+
         /**
          * Processes a query with all of its options. Applies the operation online/offline
          * @param {DataQuery} query The query to process
@@ -24547,10 +26396,18 @@ module.exports = (function () {
 
             var offlineStorageEnabled = this.everlive._isOfflineStorageEnabled();
             query.useOffline = offlineStorageEnabled ? !this.everlive.isOnline() : false;
-            query.applyOffline = offlineStorageEnabled;
 
             if (this.options) {
                 query = _.defaults(this.options, query);
+            }
+            var isCachingEnabled = (this.everlive.setup.caching === true || (this.everlive.setup.caching && this.everlive.setup.caching.enabled));
+            var isSupportedInOffline = utils.isQuerySupportedOffline(query);
+
+            query.useCache = isCachingEnabled && !query.isSync && isSupportedInOffline;
+            query.applyOffline = query.applyOffline !== undefined ? query.applyOffline : offlineStorageEnabled || query.useCache;
+
+            if (!query.useCache && query.forceCache) {
+                query.onError.call(this, new EverliveError(EverliveErrors.cannotForceCacheWhenDisabled));
             }
 
             this.options = null;
@@ -24576,46 +26433,17 @@ module.exports = (function () {
                             return self.processDataQuery(query);
                         });
                     }
-                    return whenAuthenticatedPromise
+
+                    return whenAuthenticatedPromise;
                 }
             }
 
             if ((!query.isSync && this.offlineStorage && this.offlineStorage.isSynchronizing())) {
-                query.onError.call(this, EverliveErrors.syncInProgress);
-            } else if (!query.useOffline) {
-                var originalSuccess = query.onSuccess;
-                query.onSuccess = function () {
-                    var args = arguments;
-                    var data = args[0];
-                    if (query.applyOffline) {
-                        return self._applyOffline(query, data)
-                            .then(function () {
-                                originalSuccess.apply(this, args);
-                            }, function () {
-                                query.onError.apply(this, arguments);
-                            });
-                    } else {
-                        return originalSuccess.apply(this, args);
-                    }
-                };
-
-                var getRequestOptionsFromQuery = RequestOptionsBuilder[query.operation];
-                var requestOptions = getRequestOptionsFromQuery(query);
-                var request = new Request(this.setup, requestOptions);
-                request.send();
+                query.onError.call(this, new EverliveError(EverliveErrors.syncInProgress));
+            } else if (query.useOffline) {
+                this._applyQueryOffline(query);
             } else {
-                if (!query.applyOffline) {
-                    return query.onError.call(this, new EverliveError('The applyOffline must be false when working offline.'));
-                }
-
-                self.offlineStorage.processQuery(query).then(function () {
-                    query.onSuccess.apply(this, arguments);
-                }, function (err) {
-                    if (!err.code) {
-                        err = new EverliveError(err.message, EverliveErrors.generalDatabaseError.code);
-                    }
-                    query.onError.call(this, err);
-                });
+                this._applyQueryOnline(query);
             }
         },
         // TODO implement options: { requestSettings: { executeServerCode: false } }. power fields queries could be added to that options argument
@@ -24947,7 +26775,7 @@ module.exports = (function () {
          * @method setAcl
          * @name setAcl
          * @param {object} acl The acl object.
-         * @param {object} item The item whose ACL will be updated. Note: the ID property of the item will be used to determine which item will be deleted.
+         * @param {object} item The item whose ACL will be updated. Note: the ID property of the item will be used to determine which item will be updated.
          * @returns {Promise} The promise for the request.
          */
         /**
@@ -24956,8 +26784,8 @@ module.exports = (function () {
          * @method setAcl
          * @name setAcl
          * @param {object} acl The acl object.
-         * @param {object} item The item whose ACL will be updated. Note: the ID property of the item will be used to determine which item will be deleted.
-         * @param {object} operationParameters An object which accepts operation parameters
+         * @param {object} item The item whose ACL will be updated. Note: the ID property of the item will be used to determine which item will be updated.
+         * @param {object} operationParameters An object that accepts operation parameters.
          * @param {Function} [success] A success callback.
          * @param {Function} [error] An error callback.
          */
@@ -25006,7 +26834,7 @@ module.exports = (function () {
          * @method setOwner
          * @name setOwner
          * @param {string} acl The new owner ID.
-         * @param {object} item The item whose owner will be updated. Note: the ID property of the item will be used to determine which item will be deleted.
+         * @param {object} item The item whose owner will be updated. Note: the ID property of the item will be used to determine which item will be updated.
          * @returns {Promise} The promise for the request.
          */
         /**
@@ -25015,8 +26843,8 @@ module.exports = (function () {
          * @method setOwner
          * @name setOwner
          * @param {string} acl The new owner ID.
-         * @param {object} item The item whose owner will be updated. Note: the ID property of the item will be used to determine which item will be deleted.
-         * @param {object} operationParameters An object which accepts operation parameters
+         * @param {object} item The item whose owner will be updated. Note: the ID property of the item will be used to determine which item will be updated.
+         * @param {object} operationParameters An object that accepts operation parameters.
          * @param {Function} [operationParameters.success] A success callback.
          * @param {Function} [operationParameters.error] An error callback.
          * @param {Boolean} [operationParameters.useOffline] Whether to invoke the operation on the offline storage. Default is based on the current mode of the Everlive instance.
@@ -25112,7 +26940,7 @@ module.exports = (function () {
     return Data;
 }());
 
-},{"../Everlive":43,"../EverliveError":44,"../Request":49,"../common":53,"../constants":54,"../query/DataQuery":73,"../query/RequestOptionsBuilder":76,"../utils":87}],85:[function(require,module,exports){
+},{"../Everlive":46,"../EverliveError":47,"../Request":52,"../common":58,"../constants":59,"../everlive.platform":61,"../query/DataQuery":85,"../query/RequestOptionsBuilder":88,"../utils":99}],97:[function(require,module,exports){
 /**
  * @class Files
  * @protected
@@ -25231,60 +27059,29 @@ module.exports.addFilesFunctions = function addFilesFunctions(ns) {
         }, success, error);
     };
 
-    /**
-     * Download a file to the local file system.
-     * @memberof Files.prototype
-     * @method download
-     * @param {string} url The URL of the file to download.
-     * @param {string} localPath Path on the device where the file will be saved.
-     * @param {[object]} options Additional request options.
-     * @returns {Promise} The promise for the operation.
-     */
-    /**
-     * Download a file to the local file system.
-     * @memberof Files.prototype
-     * @method download
-     * @param {string} url The URL of the file to download.
-     * @param {string} localPath Path on the device where the file will be saved.
-     * @param {[object]} options Additional request options.
-     * @param {Function} [success] A success callback.
-     * @param {Function} [error] An error callback.
-     */
-    ns.download = function (url, localPath, options, success, error) {
+    ns.download = function (url, localPath, options, trustAllHosts, success, error) {
         return buildPromise(function (success, error) {
+            if (!trustAllHosts) {
+                trustAllHosts = false;
+            }
+
             var fileTransfer = new FileTransfer();
-            fileTransfer.download(url, localPath, success, error, options);
+            fileTransfer.download(url, localPath, success, error, trustAllHosts, options);
         }, success, error);
     };
 
-    /**
-     * Upload a file to a remote location.
-     * @memberof Files.prototype
-     * @method upload
-     * @param {string} localPath Local path of the file to upload.
-     * @param {string} url The URL where the file will be uploaded to.
-     * @param {[object]} options Additional request options.
-     * @returns {Promise} The promise for the request
-     */
-    /**
-     * Upload a file to a remote location.
-     * @memberof Files.prototype
-     * @method upload
-     * @param {string} localPath Local path of the file to upload.
-     * @param {string} url The URL where the file will be uploaded to.
-     * @param {[object]} options Additional request options.
-     * @param {Function} [success] A success callback.
-     * @param {Function} [error] An error callback.
-     */
-    ns.upload = function (localPath, url, options, success, error) {
+    ns.upload = function (localPath, url, options, trustAllHosts, success, error) {
         return buildPromise(function (success, error) {
+            if (!trustAllHosts) {
+                trustAllHosts = false;
+            }
             var fileTransfer = new FileTransfer();
             var uri = encodeURI(url);
-            fileTransfer.upload(localPath, uri, success, error, options, true);
+            fileTransfer.upload(localPath, uri, success, error, options, trustAllHosts);
         }, success, error);
     }
 };
-},{"../Request":49,"../query/DataQuery":73,"../utils":87}],86:[function(require,module,exports){
+},{"../Request":52,"../query/DataQuery":85,"../utils":99}],98:[function(require,module,exports){
 /**
  * @class Users
  * @extends Data
@@ -25370,7 +27167,7 @@ module.exports.addUsersFunctions = function addUsersFunctions(ns, everlive) {
                     } else if (err.code === 601) { // invalid request, i.e. the access token is missing
                         success({result: null});
                     } else if (err.code === 801) {
-                        error(EverliveErrors.invalidToken);
+                        error(new EverliveError(EverliveErrors.invalidToken));
                     } else {
                         error(err);
                     }
@@ -25880,6 +27677,101 @@ module.exports.addUsersFunctions = function addUsersFunctions(ns, everlive) {
         everlive.authentication.setAuthorization(null, null, null);
     };
 
+    /**
+     * Sends a password reset email to a specified user.
+     * @memberOf Users.prototype
+     * @method resetPassword
+     * @name resetPassword
+     * @param {Object} user The user object, which must container either username or email address.
+     * @returns {Promise} The promise for the request.
+     */
+    /**
+     * Sends a password reset email to a specified user.
+     * @memberOf Users.prototype
+     * @method resetPassword
+     * @name resetPassword
+     * @param {Object} user The user object, which must container either username or email address.
+     * @param {Function} [success] A success callback.
+     * @param {Function} [error] An error callback.
+     */
+    ns.resetPassword = function (user, success, error) {
+        var self = this;
+
+        return buildPromise(function (successCb, errorCb) {
+            var dataQuery = new DataQuery({
+                operation: DataQuery.operations.userResetPassword,
+                collectionName: self.collectionName,
+                data: user,
+                onSuccess: successCb,
+                onError: errorCb
+            });
+
+            return self.processDataQuery(dataQuery);
+        }, success, error);
+    };
+
+    /**
+     * Set a new password for a user using a password reset code.
+     * @memberOf Users.prototype
+     * @method setPassword
+     * @name setPassword
+     * @param {object} setPasswordObject The object, which contains information necessary for changing the user password.
+     * @param {string} setPasswordObject.ResetCode The reset code obtained using a password reset email.
+     * @param {string} setPasswordObject.NewPassword The new password for the user.
+     * @returns {Promise} The promise for the request.
+     */
+    /**
+     * Set a new password for a user using a password reset code.
+     * @memberOf Users.prototype
+     * @method setPassword
+     * @name setPassword
+     * @param {object} setPasswordObject The object, which contains information necessary for changing the user password.
+     * @param {string} setPasswordObject.ResetCode The reset code obtained using a password reset email.
+     * @param {string} setPasswordObject.NewPassword The new password for the user.
+     * @param {Function} [success] A success callback.
+     * @param {Function} [error] An error callback.
+     */
+    /**
+     * Set a new password for a user using a password reset code.
+     * @memberOf Users.prototype
+     * @method setPassword
+     * @name setPassword
+     * @param {object} setPasswordObject The object, which contains information necessary for changing the user password.
+     * @param {number} setPasswordObject.Username The username that the password will be changed.
+     * @param {number} setPasswordObject.SecretQuestionId The id of the secret question.
+     * @param {string} setPasswordObject.SecretAnswer The answer to the secret question.
+     * @param {string} setPasswordObject.NewPassword The new password for the user.
+     * @returns {Promise} The promise for the request.
+     */
+    /**
+     * Set a new password for a user using a password reset code.
+     * @memberOf Users.prototype
+     * @method setPassword
+     * @name setPassword
+     * @param {object} setPasswordObject The object, which contains information necessary for changing the user password.
+     * @param {number} setPasswordObject.Username The username that the password will be changed.
+     * @param {number} setPasswordObject.SecretQuestionId The id of the secret question.
+     * @param {string} setPasswordObject.SecretAnswer The answer to the secret question.
+     * @param {string} setPasswordObject.NewPassword The new password for the user.
+     * @param {Function} [success] A success callback.
+     * @param {Function} [error] An error callback.
+     */
+    ns.setPassword = function (setPasswordObject, success, error) {
+        var self = this;
+
+        return buildPromise(function (successCb, errorCb) {
+            var dataQuery = new DataQuery({
+                operation: DataQuery.operations.userSetPassword,
+                collectionName: self.collectionName,
+                data: setPasswordObject,
+                onSuccess: successCb,
+                onError: errorCb
+            });
+
+            return self.processDataQuery(dataQuery);
+        }, success, error);
+    };
+
     ns._linkWithProvider = function (identity, userId, success, error) {
         var self = this;
         return buildPromise(function (success, error) {
@@ -25923,7 +27815,7 @@ module.exports.addUsersFunctions = function addUsersFunctions(ns, everlive) {
         }, success, error);
     };
 };
-},{"../EverliveError":44,"../Request":49,"../common":53,"../query/DataQuery":73,"../utils":87}],87:[function(require,module,exports){
+},{"../EverliveError":47,"../Request":52,"../common":58,"../query/DataQuery":85,"../utils":99}],99:[function(require,module,exports){
 var EverliveError = require('./EverliveError').EverliveError;
 var common = require('./common');
 var _ = common._;
@@ -26227,6 +28119,15 @@ utils.isGuid = function (str) {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
 };
 
+utils.isQuerySupportedOffline = function (query) {
+    var queryParams = query.getQueryParameters();
+    var hasExpandExpression = !_.isEmptyObject(queryParams.expand);
+    var unsupportedOperators = utils.getUnsupportedOperators(queryParams.filter);
+    var hasUnsupportedOperators = unsupportedOperators.length !== 0;
+    var isUnsupportedInOffline = hasExpandExpression || hasUnsupportedOperators;
+    return !isUnsupportedInOffline;
+};
+
 // http://stackoverflow.com/questions/16245767/creating-a-blob-from-a-base64-string-in-javascript/16245768#16245768
 utils.b64toBlob = function (b64Data, contentType, sliceSize) {
     contentType = contentType || '';
@@ -26285,7 +28186,7 @@ utils.transformPlatformPath = function transformPlatformPath(platformPath) {
         if (platformPath.charAt(0) === '/' && platformPath.charAt(1) !== '/') {
             platformPath = '/' + platformPath;
         }
-    } else if (platform.isAndroid) { //TODO: probably desktop too
+    } else { //TODO: probably desktop too
         if (platformPath.indexOf('file:/') !== -1 && platformPath.indexOf('file:///') === -1) {
             platformPath = platformPath.replace('file:/', 'file:///');
         }
@@ -26339,10 +28240,10 @@ utils.joinPath = function joinPath() {
 utils.uuid = function () {
     //http://stackoverflow.com/questions/105034/create-guid-uuid-in-javascript
     var d = new Date().getTime();
-    var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        var r = (d + Math.random()*16)%16 | 0;
-        d = Math.floor(d/16);
-        return (c=='x' ? r : (r&0x3|0x8)).toString(16);
+    var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        var r = (d + Math.random() * 16) % 16 | 0;
+        d = Math.floor(d / 16);
+        return (c == 'x' ? r : (r & 0x3 | 0x8)).toString(16);
     });
 
     return uuid;
@@ -26354,6 +28255,5 @@ utils.getId = function (obj) {
 
 module.exports = utils;
 
-},{"./Everlive":43,"./EverliveError":44,"./common":53,"./everlive.platform":56,"path":4}]},{},[61])
-//# sourceMappingURL=everlive.map
+},{"./Everlive":46,"./EverliveError":47,"./common":58,"./everlive.platform":61,"path":3}]},{},[66]);
 }())
