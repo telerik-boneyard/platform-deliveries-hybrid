@@ -1,5 +1,7 @@
 This application is an example for using the Offline Support provided by the Telerik Backend Services JavaScript SDK. You can find more information here: [Offline Support](http://docs.telerik.com/platform/backend-services/development/javascript-sdk/offline-mode/introduction).
 
+<a href="https://platform.telerik.com/#appbuilder/clone/https://github.com/telerik/platform-deliveries-hybrid" target="_blank"><img src="http://docs.telerik.com/platform/appbuilder/sample-apps/images/try-in-appbuilder.png" alt="Try in AppBuilder" title="Try in Telerik Platform" /></a>
+
 ### Requirements ###
 
 * Registration in Telerik Platform (https://platform.telerik.com/).
