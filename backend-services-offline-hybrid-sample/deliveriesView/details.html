@@ -7,6 +7,12 @@
         </div>
     </header>
     <div class="delivery-details">
+        <div class="image">
+            <small class="item-label">Image</small>
+            <span class="item-img">
+                <img data-bind="attr: {data-src: currentItem.DeliveryImage.Uri}" data-offline data-responsive/>
+            </span>
+        </div>
         <div class="item">
             <small class="item-label">Item</small>
             <span class="item-value" data-bind="text: currentItem.DeliveryItem"></span>

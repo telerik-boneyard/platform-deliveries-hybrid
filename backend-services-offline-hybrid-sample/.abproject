@@ -38,6 +38,8 @@
     "ID_RESOLUTION_HD720P"
   ],
   "CorePlugins": [
+    "org.apache.cordova.file",
+    "org.apache.cordova.file-transfer",
     "org.apache.cordova.network-information"
   ]
 }

@@ -4,22 +4,12 @@
     <MobileProjectCodesigningIdentities xmlns:d2p1="http://schemas.datacontract.org/2004/07/Telerik.BlackDragon.Common.Data">
       <d2p1:Project>
         <d2p1:Identifier>platform-deliveries-hybrid\backend-services-offline-hybrid-sample</d2p1:Identifier>
-        <d2p1:CodesigningIdentities>
-          <d2p1:Identity>
-            <d2p1:Platform>iOS</d2p1:Platform>
-            <d2p1:Alias>iPhone Developer Anton Dobrev (32J5PHRW2X)</d2p1:Alias>
-          </d2p1:Identity>
-        </d2p1:CodesigningIdentities>
+        <d2p1:CodesigningIdentities />
       </d2p1:Project>
     </MobileProjectCodesigningIdentities>
   </CodesigningIdentitySettings>
   <MobileProjectProvisionSettings xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
-    <MobileProjectProvisionNames xmlns:d2p1="http://schemas.datacontract.org/2004/07/Telerik.BlackDragon.Common.Data">
-      <d2p1:Project>
-        <d2p1:Identifier>platform-deliveries-hybrid\backend-services-offline-hybrid-sample</d2p1:Identifier>
-        <d2p1:MobileProvision>7946f7de-0b50-4ddd-9ec9-3693606d4335</d2p1:MobileProvision>
-      </d2p1:Project>
-    </MobileProjectProvisionNames>
+    <MobileProjectProvisionNames xmlns:d2p1="http://schemas.datacontract.org/2004/07/Telerik.BlackDragon.Common.Data" />
   </MobileProjectProvisionSettings>
   <SolutionSettings xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.datacontract.org/2004/07/Telerik.BlackDragon.Client.Modules.Settings">
     <BuildConfiguration>Debug</BuildConfiguration>

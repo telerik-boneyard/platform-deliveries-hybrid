@@ -56,6 +56,21 @@ app.models.deliveriesView = (function() {
         }
     };
 })();
+
+var buildHeaders = function() {
+        var headers = {};
+        if (app.data.defaultprovider.isOnline()) {
+            headers["X-Everlive-Expand"] = JSON.stringify({
+                Image: {
+                    TargetTypeName: 'Files',
+                    ReturnAs: 'DeliveryImage'
+                }
+            });
+        }
+        
+        return headers;
+    }
+
 app.models.deliveriesView.deliveriesViewList = (function() {
     //The default data provider for the app, an instance of the Telerik Backend Services SDK
     var dataProvider = app.data.defaultprovider;
@@ -68,12 +83,7 @@ app.models.deliveriesView.deliveriesViewList = (function() {
             typeName: 'DeliveryOrder',
             dataProvider: dataProvider,
             read: {
-                beforeSend: function (xhr) {
-                    var currentFilter = app.models.deliveriesView.deliveriesViewList.viewModel.currentFilter;
-                    if (currentFilter) {
-                        xhr.setRequestHeader("X-Everlive-Filter", JSON.stringify(currentFilter));
-                    }
-                }
+                headers: buildHeaders()
             }
         },
 
@@ -155,15 +165,17 @@ app.models.deliveriesView.deliveriesViewList = (function() {
             var item = e.view.params.uid;
             var itemModel = source.getByUid(item);
             viewModel.set('currentItem', itemModel);
+            dataProvider.helpers.html.processAll({}, function() {
+                console.log('ok');
+            }, function() {
+                console.log('fail');
+            });
         },
         editItem: function(e) {
             app.mobileApp.navigate('deliveriesView/edit.html');
         },
         onEditViewShow: function(e) {
-            //$("#dropdown").kendoDropDownList();
-            ////Initialize values
-            //var currentItem = viewModel.get('currentItem');
-            //$('#comment-textarea').val(currentItem.Comments);
+            
         },
         onSaveClick: function(e) {
             var comment = $('#comment-textarea').val();
