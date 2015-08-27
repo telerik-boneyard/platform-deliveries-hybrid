@@ -15,7 +15,7 @@
         },
         helpers: {
             html: {
-                errorImageUrl: 'http://d585tldpucybw.cloudfront.net/sfimages/default-source/default-album/404-error-page-ninja-icon.png'
+                errorImageUrl: 'images/image-not-available.png'
             }
         }
     });
