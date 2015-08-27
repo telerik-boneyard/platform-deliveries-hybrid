@@ -204,21 +204,6 @@
   text-align: center;
 }
 
-#kendo-ui-mobile-app .km-drawer-button:after,
-#kendo-ui-mobile-app .km-drawer-button:before {
-  content: '\e077';
-}
-
-.km-home:after,
-.km-home:before {
-  content: '\e\E0AF';
-}
-
-.km-dataListView:after,
-.km-dataListView:before {
-  content: '\e\E0AF';
-}
-
 .km-current:after,
 .km-current:before {
   content: '\e0bb';
@@ -347,4 +332,34 @@
 
 .list-deliveries .address {
   margin-bottom: .35em;
+}
+
+.km-on-wp.km-app .km-icon:after,
+.km-on-wp.km-app .km-filter-wrap:before,
+.km-on-wp.km-app .km-state-active .km-icon:after {
+	background-image: url("../images/wp8_inverseicons.png");
+}
+
+.km-on-wp.km-app .km-icon.km-save:after,
+.km-on-wp.km-app .km-icon.km-current:after,
+.km-on-wp.km-app .km-icon.km-pending:after,
+.km-on-wp.km-app .km-icon.km-delivered:after,
+.km-on-wp.km-app .km-icon.km-problem:after {
+    background-image: url("../images/wp8_status_icons.png");
+}
+
+.km-on-wp.km-app .km-icon.km-current:after {
+    background-position-x: 20%;
+}
+
+.km-on-wp.km-app .km-icon.km-pending:after {
+    background-position-x: 45%;
+}
+
+.km-on-wp.km-app .km-icon.km-delivered:after {
+    background-position-x: 70%;
+}
+
+.km-on-wp.km-app .km-icon.km-problem:after {
+    background-position-x: 94%;
 }
