@@ -205,27 +205,31 @@
   text-align: center;
 }
 
-.km-current:after,
-.km-current:before {
+#kendo-ui-mobile-app .km-current:after,
+#kendo-ui-mobile-app .km-current:before {
   content: '\e0bb';
+  -webkit-text-fill-color: #00f;
   color: #00f;
 }
 
-.km-pending:after,
-.km-pending:before {
+#kendo-ui-mobile-app .km-pending:after,
+#kendo-ui-mobile-app .km-pending:before {
   content: '\e08d';
+  -webkit-text-fill-color: #ffa500;
   color: #ffa500;
 }
 
-.km-delivered:after,
-.km-delivered:before {
+#kendo-ui-mobile-app .km-delivered:after,
+#kendo-ui-mobile-app .km-delivered:before {
   content: '\e030';
+  -webkit-text-fill-color: #008000;
   color: #008000;
 }
 
-.km-problem:after,
-.km-problem:before {
+#kendo-ui-mobile-app .km-problem:after,
+#kendo-ui-mobile-app .km-problem:before {
   content: '\e031';
+  -webkit-text-fill-color: #f00;
   color: #f00;
 }
 
