@@ -148,6 +148,7 @@
 }
 
 #kendo-ui-mobile-app .km-back {
+  -webkit-transform: rotate(180deg);
   transform: rotate(180deg);
 }
 
