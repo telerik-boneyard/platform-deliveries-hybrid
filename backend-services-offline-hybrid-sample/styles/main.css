@@ -378,3 +378,58 @@
 .km-on-wp.km-app .km-icon.km-problem:after {
     background-position-x: 94%;
 }
+
+.dropdownlist {
+  position: relative;
+  display: block;
+  margin-top: 0.5em;
+  overflow: hidden;
+  width: 100%;
+  max-width: 100%;
+  border: 1px solid #bbb;
+  border-radius: .2em;
+  background: #fff;
+}
+
+select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  font-size: 15px;
+  background: none;
+  border: none;
+  color: #4c5356;
+  outline: none;
+  padding: .4em 19% .4em .8em;
+  font-family: helvetica, sans-serif;
+  line-height: 1.3;
+  margin: .2em;
+}
+
+select::-ms-expand {
+  display: none;
+}
+
+.dropdownlist:after {
+  background: none;
+  color: #bbb;
+  content: "\25BC";
+  font-size: .7em;
+  padding: 0;
+  position: absolute;
+  right: 1em;
+  top: 1.2em;
+  bottom: .3em;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.km-on-wp .dropdownlist:after {
+    top: .5em;
+}
+
+.dropdownlist:hover {
+  border-color: #888;
+}
