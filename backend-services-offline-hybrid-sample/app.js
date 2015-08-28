@@ -20,6 +20,10 @@
                 // view only because this is a sample app and we need to check some things before we actually run the app (API key present, etc.)
                 initial: 'loading/view.html'
             });
+            
+            if (os.wp) {
+                $('body').css('height', window.innerHeight);
+            }
 
             onConnectivityChanged(app.isOnline());
         });
