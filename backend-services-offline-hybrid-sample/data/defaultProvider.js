@@ -2,7 +2,6 @@
 
 (function() {
     //create a reference for the data provider to be used throughout the app
-
     app.data.defaultprovider = new Everlive({
         apiKey: Config.ApiKey,
         scheme: 'https',
@@ -12,6 +11,11 @@
             persist: true,
             onAuthenticationRequired: function() {
                 app.navigate('signinView/view.html');
+            }
+        },
+        helpers: {
+            html: {
+                errorImageUrl: 'images/image-not-available.png'
             }
         }
     });
