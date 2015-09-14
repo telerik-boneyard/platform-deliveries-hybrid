@@ -55,7 +55,7 @@ The Deliveries sample app comes fully functional, but to see it in action you mu
 
 To do that, set the API Key for your Telerik Backend Services project. This is a unique string that links the sample mobile app to a project in Telerik Backend Services where all the data is read from/saved.
 
-1. Click the "Try in AppBuilder" button to clone the repository in AppBuilder.
+1. Click the "Try in AppBuilder" button to clone the repository in AppBuilder.<br>
 	An app called "My App" is created for you with an AppBuilder project set up.
 2. Click **My App** in the navigation bar at the top to go the app home.
 3. Create a Backend Services project.
