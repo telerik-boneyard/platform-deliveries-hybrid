@@ -70,7 +70,7 @@ To do that, set the API Key for your Telerik Backend Services project. This is a
 
 Once the app is configured, you can run it either on a real device or in the Telerik AppBuilder simulator.
 
-To run it. follow the steps in the product's documentation: [Running Apps on Devices](http://docs.telerik.com/platform/appbuilder/testing-your-app/running-on-devices/working-with-devices).
+To run it, follow the steps in the product's documentation: [Running Apps on Devices](http://docs.telerik.com/platform/appbuilder/testing-your-app/running-on-devices/working-with-devices).
 
 After you run the app successfully, it guides you through a data initialization process which builds the necessary data structure in your Backend Services project and then creates sample data.
 
