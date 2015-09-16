@@ -1,4 +1,4 @@
-(function () { if (typeof module === "object") { var everliveModule = module; } if (typeof define !== "undefined" && define.amd) { define(function() { return Everlive; }); } (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.Everlive = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -554,38 +554,71 @@ var substr = 'ab'.substr(-1) === 'b'
 ;
 
 }).call(this,require('_process'))
+
 },{"_process":4}],4:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
 var queue = [];
 var draining = false;
+var currentQueue;
+var queueIndex = -1;
+
+function cleanUpNextTick() {
+    draining = false;
+    if (currentQueue.length) {
+        queue = currentQueue.concat(queue);
+    } else {
+        queueIndex = -1;
+    }
+    if (queue.length) {
+        drainQueue();
+    }
+}
 
 function drainQueue() {
     if (draining) {
         return;
     }
+    var timeout = setTimeout(cleanUpNextTick);
     draining = true;
-    var currentQueue;
+
     var len = queue.length;
     while(len) {
         currentQueue = queue;
         queue = [];
-        var i = -1;
-        while (++i < len) {
-            currentQueue[i]();
+        while (++queueIndex < len) {
+            currentQueue[queueIndex].run();
         }
+        queueIndex = -1;
         len = queue.length;
     }
+    currentQueue = null;
     draining = false;
+    clearTimeout(timeout);
 }
+
 process.nextTick = function (fun) {
-    queue.push(fun);
-    if (!draining) {
+    var args = new Array(arguments.length - 1);
+    if (arguments.length > 1) {
+        for (var i = 1; i < arguments.length; i++) {
+            args[i - 1] = arguments[i];
+        }
+    }
+    queue.push(new Item(fun, args));
+    if (queue.length === 1 && !draining) {
         setTimeout(drainQueue, 0);
     }
 };
 
+// v8 likes predictible objects
+function Item(fun, array) {
+    this.fun = fun;
+    this.array = array;
+}
+Item.prototype.run = function () {
+    this.fun.apply(null, this.array);
+};
 process.title = 'browser';
 process.browser = true;
 process.env = {};
@@ -1211,6 +1244,7 @@ function hasOwnProperty(obj, prop) {
 }
 
 }).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+
 },{"./support/isBuffer":5,"_process":4,"inherits":2}],7:[function(require,module,exports){
 var json = typeof JSON !== 'undefined' ? JSON : require('jsonify');
 
@@ -2375,9 +2409,9 @@ module.exports = function (value, replacer, space) {
         _.extend(this._operators, {"$project": this._projection});
       }
 
-      if (!_.isArray(this._collection) && !_.isObject(this._collection)) {
-        throw new Error("Input collection is not of valid type. Must be an Array.");
-      }
+      // if (!_.isArray(this._collection) && !_.isObject(this._collection)) {
+      //   throw new Error("Input collection is not of valid type. Must be an Array.");
+      // }
 
       // filter collection
       this._result = _.filter(this._collection, this._query.test, this._query);
@@ -2728,6 +2762,15 @@ module.exports = function (value, replacer, space) {
       if (_.isEmpty(expr)) {
         return collection;
       }
+      var usesExclusion = false;
+      _.each(expr, function(val, key) {
+        if(val === 0 && key !== settings.key) {
+           usesExclusion = true;
+        }
+        if(val !== 0 && usesExclusion) {
+            throw new Error("You cannot mix including and excluding fields."); 
+        }
+      });
 
       // result collection
       var projected = [];
@@ -3981,6 +4024,7 @@ module.exports = function (value, replacer, space) {
   }
 
 }(this));
+
 },{"stream":"stream","underscore":35,"util":6}],13:[function(require,module,exports){
 
 /**
@@ -4908,17 +4952,10 @@ exports.formatArgs = formatArgs;
 exports.save = save;
 exports.load = load;
 exports.useColors = useColors;
-
-/**
- * Use chrome.storage.local if we are in an app
- */
-
-var storage;
-
-if (typeof chrome !== 'undefined' && typeof chrome.storage !== 'undefined')
-  storage = chrome.storage.local;
-else
-  storage = localstorage();
+exports.storage = 'undefined' != typeof chrome
+               && 'undefined' != typeof chrome.storage
+                  ? chrome.storage.local
+                  : localstorage();
 
 /**
  * Colors.
@@ -5026,9 +5063,9 @@ function log() {
 function save(namespaces) {
   try {
     if (null == namespaces) {
-      storage.removeItem('debug');
+      exports.storage.removeItem('debug');
     } else {
-      storage.debug = namespaces;
+      exports.storage.debug = namespaces;
     }
   } catch(e) {}
 }
@@ -5043,7 +5080,7 @@ function save(namespaces) {
 function load() {
   var r;
   try {
-    r = storage.debug;
+    r = exports.storage.debug;
   } catch(e) {}
   return r;
 }
@@ -5311,6 +5348,8 @@ module.exports = function(val, options){
  */
 
 function parse(str) {
+  str = '' + str;
+  if (str.length > 10000) return;
   var match = /^((?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$/i.exec(str);
   if (!match) return;
   var n = parseFloat(match[1]);
@@ -10409,6 +10448,7 @@ code.google.com/p/crypto-js/wiki/License
 
 
 }).call(this,require('_process'))
+
 },{"_process":4}],35:[function(require,module,exports){
 //     Underscore.js 1.8.3
 //     http://underscorejs.org
@@ -14165,6 +14205,7 @@ module.exports = RelationTreeBuilder;
 }());
 
 }).call(this,require('_process'))
+
 },{"_process":4}],43:[function(require,module,exports){
 //     Underscore.js 1.8.2
 //     http://underscorejs.org
@@ -15854,13 +15895,15 @@ module.exports = (function () {
      * @param {string} [options.scheme=http] - The URI scheme used to make requests. Supported values: http, https
      * @param {boolean} [options.parseOnlyCompleteDateTimeObjects=false] - If set to true, the SDK will parse only complete date strings (according to the ISO 8601 standard).
      * @param {boolean} [options.emulatorMode=false] - Set this option to true to set the SDK in emulator mode.
-     * @param {object|boolean} [options.offline] - Set this option to true to use the default offline settings.
-	 * @param {boolean} [options.offline.enabled=false] - When using an object to initialize Offline Support with non-default settings, set this option to enable or disable Offline Support.
+     * @param {object|boolean} [options.offline] - Set this option to true to enable Offline Support using the default offline settings.
+     * @param {boolean} [options.offline.enabled=false] - When using an object to initialize Offline Support with non-default settings, set this option to enable or disable Offline Support.
      * @param {boolean} [options.offline.isOnline=true] - Whether the storage is in online mode initially.
      * @param {ConflictResolutionStrategy|function} [options.offline.conflicts.strategy=ConflictResolutionStrategy.ClientWins] - A constant specifying the conflict resolution strategy or a function used to resolve the conflicts.
-     * @param {StorageProvider|object} [options.offline.storage.provider=StorageProvider.LocalStorage] - An object specifying settings for the offline storage provider.
-     * @param {string} [options.offline.storage.storagePath=el_store] - A relative path specifying where the files will be saved if file system is used for persistence for item metadata.
-     * @param {number} [options.offline.storage.requestedQuota=10485760] - How much memory (in bytes) to be requested when using the file system for persistence. This option is only valid for Chrome as the other platforms use all the available space.
+     * @param {object} [options.offline.storage] - An object specifying settings for the offline storage.
+     * @param {string} [options.offline.storage.provider=_platform dependant_] - Allows you to select an offline storage provider. Possible values: Everlive.Constants.StorageProvider.LocalStorage, Everlive.Constants.StorageProvider.FileSystem, Everlive.Constants.StorageProvider.Custom. Default value: Cordova, Web: Everlive.Constants.StorageProvider.LocalStorage; NativeScript, Node.js: Everlive.Constants.StorageProvider.FileSystem.
+     * @param {string} [options.offline.storage.storagePath=el_store] - A relative path specifying where data will be saved if the FileSystem provider is used.
+     * @param {number} [options.offline.storage.requestedQuota=10485760] - How much memory (in bytes) to be requested when using FileSystem for persistence. This option is only valid for Chrome as the other platforms use all the available space.
+     * @param {object} [options.offline.storage.implementation] - When storage.provider is set to custom, use this object to specify your custom offline storage implementation.
      * @param {string} [options.offline.encryption.key] - A key that will be used to encrypt the data stored offline.
      * @param {string} [options.offline.files.storagePath=el_file_store] - A relative path specifying where the files will be saved if file system is used for persistence of files in offline mode.
      * @param {string} [options.offline.files.metaPath=el_file_mapping] - A relative path specifying where the metadata file will be saved if file system is used for persistence of files in offline mode.
@@ -15882,6 +15925,10 @@ module.exports = (function () {
      * @param {object} [options.helpers.html.attributes.fileSource=data-href] - A custom name for the attribute to be used to set the anchor source.
      * @param {object} [options.helpers.html.attributes.enableOffline=data-offline] - A custom name for the attribute to be used to control offline processing.
      * @param {object} [options.helpers.html.attributes.enableResponsive=data-responsive] - A custom name for the attribute to be used to control Responsive Images processing.
+     * @param {object|boolean} [options.caching=false] - Set this option to true to enable caching using the default cache settings.
+     * @param {number} [options.caching.maxAge=60] - Global setting for maximum age of cached items in minutes.
+     * @param {boolean} [options.caching.enabled=false] - Global setting for enabling or disabling cache.
+     * @param {object} [options.caching.typeSettings] - Specify per-content-type settings that override the global settings.
      */
     function Everlive(options) {
         var self = this;
@@ -16065,7 +16112,7 @@ module.exports = (function () {
      * @param {Function} [options.success] Success callback that will be called when the request finishes successfully.
      * @param {Function} [options.error] Error callback to be called in case of an error.
      * @param {object} [options.headers] Additional headers to be included in the request.
-     * @param {Query|object} [options.filter] This is either a {@link Query} or a [filter]({% slug rest-api-querying-filtering %}) expression.
+     * @param {Query|object} [options.filter] This is either a {@link Query} or a [filter](http://docs.telerik.com/platform/backend-services/rest/queries/queries-filtering) expression.
      * @param {boolean} [options.authHeaders=true] When set to false, no Authorization headers will be sent with the request.
      * @returns {function} The request configuration object containing the `send` function that sends the request.
      */
@@ -16210,7 +16257,13 @@ module.exports = (function () {
          * @description An instance of the [Authentication]{@link Authentication} class for working with the authentication of the SDK.
          * @member {Authentication} authentication
          */
-        this.authentication = new Authentication(this, this.setup.authentication);
+        /**
+         * @memberOf Everlive
+         * @instance
+         * @description An instance of the [Authentication]{@link Authentication} class for working with the authentication of the SDK.
+         * @member {authentication} authentication
+         */
+        this.authentication = this.Authentication = new Authentication(this, this.setup.authentication);
     };
 
     var initializeHelpers = function initializeHelpers(options) {
@@ -16297,6 +16350,10 @@ var EverliveErrors = {
     cannotForceCacheWhenDisabled: {
         code: 705,
         message: 'Cannot use forceCache while the caching is disabled.'
+    },
+    filesNotSupportedInBrowser: {
+        code: 706,
+        message: 'Offline files are not supported in web browsers.'
     }
 };
 
@@ -16471,7 +16528,12 @@ module.exports = (function () {
          * @memberOf Push.prototype
          */
         ensurePushIsAvailable: function () {
-            CurrentDevice.ensurePushIsAvailable();            
+            var isPushNotificationPluginAvailable = (typeof window !== 'undefined' && window.plugins && window.plugins.pushNotification);
+
+            if (!isPushNotificationPluginAvailable && !this._inAppBuilderSimulator()) {
+                throw new EverliveError("The push notification plugin is not available. Ensure that the pushNotification plugin is included " +
+                "and use after `deviceready` event has been fired.");
+            }
         },
         /**
          * Returns the current device for sending push notifications
@@ -16488,17 +16550,19 @@ module.exports = (function () {
 
             if (arguments.length === 0) {
                 emulatorMode = this._el.setup._emulatorMode;
-            }            
+            }
 
             if (!this._currentDevice) {
                 this._currentDevice = new CurrentDevice(this);
             }
 
-            var inAppBuilderSimulator = typeof window !== undefined && window.navigator && window.navigator.simulator;
-
-            this._currentDevice.emulatorMode = emulatorMode || inAppBuilderSimulator;
+            this._currentDevice.emulatorMode = emulatorMode || this._inAppBuilderSimulator();
 
             return this._currentDevice;
+        },
+
+        _inAppBuilderSimulator: function () {
+            return typeof window !== undefined && window.navigator && window.navigator.simulator;
         },
 
         /**
@@ -16681,6 +16745,8 @@ module.exports = (function () {
          * @param {Function} [onError] Callback to invoke on error.
          */
         setBadgeNumber: function (badge, onSuccess, onError) {
+            var self = this;
+
             this.ensurePushIsAvailable();
 
             badge = parseInt(badge);
@@ -16698,7 +16764,7 @@ module.exports = (function () {
             return buildPromise(function (successCb, errorCb) {
                 currentDevice._pushHandler.devices.updateSingle(deviceRegistration).then(
                     function () {
-                        if (window.plugins && window.plugins.pushNotification) {
+                        if (window.plugins && window.plugins.pushNotification && !self._inAppBuilderSimulator()) {
                             return window.plugins.pushNotification.setApplicationIconBadgeNumber(successCb, errorCb, badge);
                         } else {
                             return successCb();
@@ -17496,6 +17562,16 @@ var cacheableOperations = [
     DataQuery.operations.count
 ];
 
+/**
+ * @class CacheModule
+ * @classDesc A class providing access to the various caching features.
+ */
+
+/**
+ * Represents the {@link CacheModule} class.
+ * @memberOf Everlive.prototype
+ * @member {CacheModule} cache
+ */
 CacheModule.prototype = {
     _hash: function (obj) {
         return jsonStringify(obj);
@@ -17505,7 +17581,7 @@ CacheModule.prototype = {
     _initStore: function (sdkOptions) {
         if (!this.persister) {
             var offlineStorageOptions = buildOfflineStorageOptions(sdkOptions);
-            var storageKey = this.options.storage.storagePath;
+            var storageKey = this.options.storage.storagePath + '_' + sdkOptions.apiKey;
 
             this.persister = persisters.getPersister(storageKey, offlineStorageOptions);
         }
@@ -17615,6 +17691,11 @@ CacheModule.prototype = {
                                         return self._cacheQuery(dataQuery, hash);
                                     });
                             } else {
+                                //If cache is used, change 'me' to the ID of the logged in user (only for currentUser() requests).
+                                if (dataQuery.operation === DataQuery.operations.readById && dataQuery.additionalOptions.id === 'me') {
+                                    dataQuery.additionalOptions.id = self._everlive.setup.principalId;
+                                }
+
                                 return self._everlive.offlineStorage.processQuery(dataQuery)
                                     .then(function (result) {
                                         dataQuery.onSuccess(result);
@@ -17716,6 +17797,23 @@ CacheModule.prototype = {
         return this._hash(queryParams);
     },
 
+    /**
+     * Clears the cached data for a specified content type.
+     * @method clear
+     * @name clear
+     * @param {string} contentType The content type to clear.
+     * @memberOf CacheModule.prototype
+     * @returns {Promise}
+     */
+    /**
+     * Clears the cached data for a specified content type.
+     * @method clear
+     * @name clear
+     * @param {string} contentType The content type to clear.
+     * @memberOf CacheModule.prototype
+     * @param {function} [success] A success callback.
+     * @param {function} [error] An error callback.
+     */
     clear: function (contentType, success, error) {
         var self = this;
 
@@ -17731,6 +17829,21 @@ CacheModule.prototype = {
         }, success, error);
     },
 
+    /**
+     * Clears all data from the cache.
+     * @method clearAll
+     * @name clearAll
+     * @memberOf CacheModule.prototype
+     * @returns {Promise}
+     */
+    /**
+     * Clears all data from the cache.
+     * @method clearAll
+     * @name clearAll
+     * @memberOf CacheModule.prototype
+     * @param {function} [success] A success callback.
+     * @param {function} [error] An error callback.
+     */
     clearAll: function (success, error) {
         var self = this;
         self.cacheData = null;
@@ -17845,9 +17958,6 @@ module.exports = (function () {
     dependencyStore.Processor = require('../scripts/bs-expand-processor');
     exportDependency('Processor');
 
-    //dependencyStore.Base64 = require('Base64');
-    //exportDependency('Base64');
-
     dependencyStore.rsvp = require('rsvp');
     exportDependency('RSVP', 'rsvp');
 
@@ -17859,6 +17969,7 @@ module.exports = (function () {
     return common;
 }());
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+
 },{"../scripts/bs-expand-processor":39,"./everlive.platform":61,"./reqwest.nativescript":90,"./reqwest.nodejs":91,"json-stable-stringify":7,"jstimezonedetect":11,"mingo":12,"mongo-query":14,"reqwest":33,"rsvp":34,"underscore":35}],59:[function(require,module,exports){
 /**
  * Constants used by the SDK
@@ -18141,6 +18252,7 @@ module.exports = {
     platform: platform
 };
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+
 },{}],62:[function(require,module,exports){
 'use strict';
 
@@ -18821,7 +18933,7 @@ module.exports = (function () {
  */
 /*!
  Everlive SDK
- Version 1.5.1
+ Version 1.5.6
  */
 (function () {
     var Everlive = require('./Everlive');
@@ -18854,20 +18966,7 @@ module.exports = (function () {
         FileSystem: persistersModule.FileSystemPersister
     };
 
-    //everliveModule is provided by a closure generated during build
-    if (platform.isNodejs || platform.isNativeScript) {
-        if (typeof everliveModule !== 'undefined') {
-            everliveModule.exports = Everlive;
-        }
-
-        if (typeof module !== 'undefined') {
-            module.exports = Everlive;
-        }
-    } else {
-        //in requirejs Everlive is defined in the same closure
-        //browser
-        common.root.Everlive = Everlive;
-    }
+    module.exports = Everlive;
 }());
 },{"./Everlive":46,"./GeoPoint":50,"./Request":52,"./common":58,"./constants":59,"./everlive.platform":61,"./kendo/kendo.everlive":67,"./offline/offlinePersisters":77,"./query/Query":86,"./query/QueryBuilder":87,"./types/Data":96,"./utils":99}],67:[function(require,module,exports){
 var QueryBuilder = require('../query/QueryBuilder');
@@ -20230,6 +20329,7 @@ var DataQuery = require('../query/DataQuery');
 var utils = require('../utils');
 var offlineTransformations = require('./offlineTransformations');
 var expandProcessor = require('../ExpandProcessor');
+var platform = require('../everlive.platform');
 
 var everliveErrorModule = require('../EverliveError');
 var EverliveError = everliveErrorModule.EverliveError;
@@ -20297,6 +20397,14 @@ function OfflineQueryProcessor(persister, encryptionProvider, offlineFilesProces
 
 OfflineQueryProcessor.prototype = {
     processQuery: function (dataQuery) {
+        if (utils.isContentType.files(dataQuery.collectionName) && platform.isDesktop) {
+            if (this.everlive.isOnline()) {
+                return utils.successfulPromise();
+            } else {
+                return utils.rejectedPromise(new EverliveError(EverliveErrors.filesNotSupportedInBrowser));
+            }
+        }
+
         var unsupportedClientOpMessage = this.getUnsupportedClientOpMessage(dataQuery);
         if (unsupportedClientOpMessage && !dataQuery.isSync) {
             return new rsvp.Promise(function (resolve, reject) {
@@ -21044,6 +21152,8 @@ OfflineQueryProcessor.prototype = {
         var self = this;
         this._collectionCache = {};
         return buildPromise(function (success, error) {
+            self._collectionCache = {};
+
             self._persister.purgeAll(function () {
                 if (self.everlive.setup.caching) {
                     self.everlive.cache.clearAll(success, error);
@@ -21057,6 +21167,8 @@ OfflineQueryProcessor.prototype = {
     purge: function (contentType, success, error) {
         var self = this;
         return buildPromise(function (success, error) {
+            delete self._collectionCache[contentType];
+
             self._persister.purge(contentType, function () {
                 if (self.everlive.setup.caching) {
                     self.everlive.cache.clear(contentType, success, error);
@@ -21069,7 +21181,7 @@ OfflineQueryProcessor.prototype = {
 };
 
 module.exports = OfflineQueryProcessor;
-},{"../EverliveError":47,"../ExpandProcessor":48,"../common":58,"../constants":59,"../query/DataQuery":85,"../query/Query":86,"../utils":99,"./offlineTransformations":78,"path":3}],75:[function(require,module,exports){
+},{"../EverliveError":47,"../ExpandProcessor":48,"../common":58,"../constants":59,"../everlive.platform":61,"../query/DataQuery":85,"../query/Query":86,"../utils":99,"./offlineTransformations":78,"path":3}],75:[function(require,module,exports){
 var DataQuery = require('../query/DataQuery');
 var everliveErrorModule = require('../EverliveError');
 var EverliveError = everliveErrorModule.EverliveError;
@@ -21117,7 +21229,7 @@ module.exports = (function () {
             this._offlineFilesProcessor, this._everlive, this.setup);
 
         /**
-         * @memberOf Everlive.prototype
+         * @memberOf OfflineModule.prototype
          * @instance
          * @description An instance of the [OfflineFilesModule]{@link OfflineFilesModule} class for working with files in offline mode.
          * @member {OfflineFilesModule} files
@@ -21141,7 +21253,7 @@ module.exports = (function () {
 
     OfflineModule.prototype = {
         /**
-         * Removes all data from the offline storage.
+         * Removes all data from the offline storage. If caching is enabled clears the entire cache as well.
          * @method purgeAll
          * @name purgeAll
          * @memberOf OfflineModule.prototype
@@ -21149,18 +21261,19 @@ module.exports = (function () {
          * @param {function} [error] An error callback.
          */
         /**
-         * Removes all data from the offline storage.
+         * Removes all data from the offline storage. If caching is enabled clears the entire cache as well.
          * @method purgeAll
          * @name purgeAll
          * @memberOf OfflineModule.prototype
-         * @returns Promise
+         * @returns {Promise}
          */
         purgeAll: function (success, error) {
             return this._queryProcessor.purgeAll(success, error);
         },
 
         /**
-         * Removes all data for a specific content type from the offline storage.
+         * Removes all data for a specific content type from the offline storage. If caching is enabled clears the cache
+         * for the specified content type as well.
          * @method purge
          * @name purge
          * @memberOf OfflineModule.prototype
@@ -21169,12 +21282,13 @@ module.exports = (function () {
          * @param {function} [error] An error callback.
          */
         /**
-         * Removes all data for a specific content type from the offline storage.
+         * Removes all data for a specific content type from the offline storage. If caching is enabled clears the cache
+         * for the specified content type as well.
          * @method purge
          * @name purge
          * @memberOf OfflineModule.prototype
          * @param {string} contentType The content type to purge.
-         * @returns Promise
+         * @returns {Promise}
          */
         purge: function (contentType, success, error) {
             return this._queryProcessor.purge(contentType, success, error);
@@ -22472,7 +22586,7 @@ module.exports = (function () {
          * @method getItemsForSync
          * @name getItemsForSync
          * @memberOf OfflineModule.prototype
-         * @returns Promise
+         * @returns {Promise}
          */
         getItemsForSync: function (success, error) {
             var self = this;
@@ -23793,9 +23907,10 @@ var buildPromise = require('../utils').buildPromise;
 var EverliveError = require('../EverliveError').EverliveError;
 var Platform = require('../constants').Platform;
 var common = require('../common');
+var utils = require('../utils');
 var jstz = common.jstz;
 var _ = common._;
-var tnsPushPlugin = require('nativescript-push-notifications');
+var tnsPushPluginLazy = utils.lazyRequire('nativescript-push-notifications', 'tnsPushPlugin');
 var tnsPlatform = require('platform');
 
 module.exports = (function () {
@@ -23881,10 +23996,10 @@ module.exports = (function () {
 
                             var platformType = self._getPlatformType();
                             if(platformType === Platform.Android) {
-                                return tnsPushPlugin.unregister(successCallback, error, self.pushSettings.android);
+                                return tnsPushPluginLazy.tnsPushPlugin.unregister(successCallback, error, self.pushSettings.android);
                             }
 
-                            tnsPushPlugin.unregister(successCallback, error);
+                            tnsPushPluginLazy.tnsPushPlugin.unregister(successCallback, error);
                         },
                         successCb,
                         errorCb
@@ -24028,12 +24143,12 @@ module.exports = (function () {
             options = options || {};
             
             return buildPromise(function (successCb, errorCb) {
-                tnsPushPlugin.areNotificationsEnabled(successCb, errorCb, options);
+                tnsPushPluginLazy.tnsPushPlugin.areNotificationsEnabled(successCb, errorCb, options);
             }, onSuccess, onError);
         },
 
         _initializeInteractivePush: function (iOSSettings, success, error) {
-            tnsPushPlugin.registerUserNotificationSettings(
+            tnsPushPluginLazy.tnsPushPlugin.registerUserNotificationSettings(
                 // the success callback which will immediately return (APNs is not contacted for this)
                 success,
                 // called in case the configuration is incorrect
@@ -24071,7 +24186,7 @@ module.exports = (function () {
 
                 apnRegistrationOptions.notificationCallbackIOS = this.pushSettings.notificationCallbackIOS;
                 //Register for APN
-                tnsPushPlugin.register(
+                tnsPushPluginLazy.tnsPushPlugin.register(
                     apnRegistrationOptions,
                     _.bind(this._successfulRegistrationAPN, this),
                     _.bind(this._failedRegistrationAPN, this)                    
@@ -24084,7 +24199,7 @@ module.exports = (function () {
                 gcmRegistrationOptions.notificationCallbackAndroid = this.pushSettings.notificationCallbackAndroid;
 
                 //Register for GCM
-                tnsPushPlugin.register(
+                tnsPushPluginLazy.tnsPushPlugin.register(
                     gcmRegistrationOptions,
                     _.bind(this._successSentRegistrationGCM, this),
                     _.bind(this._errorSentRegistrationGCM, this)
@@ -24264,7 +24379,7 @@ module.exports = (function () {
             //console.log("Successfully sent request for registering with GCM.");
 
             // set on message received.
-            tnsPushPlugin.onMessageReceived(this.pushSettings.notificationCallbackAndroid);
+            tnsPushPluginLazy.tnsPushPlugin.onMessageReceived(this.pushSettings.notificationCallbackAndroid);
 
             this._deviceRegistrationSuccess(token);
         },
@@ -24318,7 +24433,7 @@ module.exports = (function () {
     return CurrentDevice;
 }());
 
-},{"../EverliveError":47,"../common":58,"../constants":59,"../utils":99,"nativescript-push-notifications":"nativescript-push-notifications","platform":"platform"}],85:[function(require,module,exports){
+},{"../EverliveError":47,"../common":58,"../constants":59,"../utils":99,"platform":"platform"}],85:[function(require,module,exports){
 var _ = require('../common')._;
 var constants = require('../constants');
 var Query = require('../query/Query');
@@ -24456,12 +24571,12 @@ module.exports = (function () {
     /**
      * @class Query
      * @classdesc A query class used to describe a request that will be made to the {{site.TelerikBackendServices}} JavaScript API.
-     * @param {object} [filter] A [filter expression]({% slug rest-api-querying-filtering %}) definition.
-     * @param {object} [fields] A [fields expression]({% slug rest-api-querying-Subset-of-fields %}) definition.
-     * @param {object} [sort] A [sort expression]({% slug rest-api-querying-sorting %}) definition.
+     * @param {object} [filter] A [filter expression](http://docs.telerik.com/platform/backend-services/rest/queries/queries-filtering) definition.
+     * @param {object} [fields] A [fields expression](http://docs.telerik.com/platform/backend-services/rest/queries/queries-subset-fields) definition.
+     * @param {object} [sort] A [sort expression](http://docs.telerik.com/platform/backend-services/rest/queries/queries-sorting) definition.
      * @param {number} [skip] Number of items to skip. Used for paging.
      * @param {number} [take] Number of items to take. Used for paging.
-     * @param {object} [expand] An [expand expression]({% slug features-data-relations-defining-expand %}) definition.
+     * @param {object} [expand] An [expand expression](http://docs.telerik.com/platform/backend-services/rest/data/relations/relations-defining) definition.
      */
     function Query(filter, fields, sort, skip, take, expand) {
         this.filter = filter;
@@ -24478,7 +24593,7 @@ module.exports = (function () {
          * @memberOf Query.prototype
          * @method where
          * @name where
-         * @param {object} filter A [filter expression]({% slug rest-api-querying-filtering %}) definition.
+         * @param {object} filter A [filter expression](http://docs.telerik.com/platform/backend-services/rest/queries/queries-filtering) definition.
          * @returns {Query}
          */
         /** Defines a filter definition for the current query.
@@ -24498,7 +24613,7 @@ module.exports = (function () {
         /** Applies a fields selection to the current query. This allows you to retrieve only a subset of all available item fields.
          * @memberOf Query.prototype
          * @method select
-         * @param {object} fieldsExpression A [fields expression]({% slug rest-api-querying-Subset-of-fields %}) definition.
+         * @param {object} fieldsExpression A [fields expression](http://docs.telerik.com/platform/backend-services/rest/queries/queries-subset-fields) definition.
          * @returns {Query}
          */
         select: function () {
@@ -24549,7 +24664,7 @@ module.exports = (function () {
         /** Sets an expand expression for the current query. This allows you to retrieve complex data sets using a single query based on relations between data types.
          * @memberOf Query.prototype
          * @method expand
-         * @param {object} expandExpression An [expand expression]({% slug features-data-relations-defining-expand %}) definition.
+         * @param {object} expandExpression An [expand expression](http://docs.telerik.com/platform/backend-services/rest/data/relations/relations-defining) definition.
          * @returns {Query}
          */
         expand: function (expandExpression) {
@@ -25311,7 +25426,7 @@ module.exports = (function () {
          * @memberOf WhereQuery.prototype
          * @param {string} field Field name.
          * @param {string} regularExpression Regular expression in PCRE format.
-         * @param {string} [options] A string of regex options to use. See [specs]({http://docs.mongodb.org/manual/reference/operator/query/regex/#op._S_options}) for a description of available options.
+         * @param {string} [options] A string of regex options to use. See [specs](http://docs.mongodb.org/manual/reference/operator/query/regex/#op._S_options) for a description of available options.
          * @returns {WhereQuery}
          */
         regex: function (field, value, flags) {
@@ -25323,7 +25438,7 @@ module.exports = (function () {
          * @memberOf WhereQuery.prototype
          * @param {string} field Field name.
          * @param {string} value The string that the field should start with.
-         * @param {string} [options] A string of regex options to use. See [specs]({http://docs.mongodb.org/manual/reference/operator/query/regex/#op._S_options}) for a description of available options.
+         * @param {string} [options] A string of regex options to use. See [specs](http://docs.mongodb.org/manual/reference/operator/query/regex/#op._S_options) for a description of available options.
          * @returns {WhereQuery}
          */
         startsWith: function (field, value, flags) {
@@ -25335,7 +25450,7 @@ module.exports = (function () {
          * @memberOf WhereQuery.prototype
          * @param {string} field Field name.
          * @param {string} value The string that the field should end with.
-         * @param {string} [options] A string of  regex options to use. See [specs]({http://docs.mongodb.org/manual/reference/operator/query/regex/#op._S_options}) for a description of available options.
+         * @param {string} [options] A string of  regex options to use. See [specs](http://docs.mongodb.org/manual/reference/operator/query/regex/#op._S_options) for a description of available options.
          * @returns {WhereQuery}
          */
         endsWith: function (field, value, flags) {
@@ -25579,6 +25694,7 @@ module.exports = (function () {
     return reqwest;
 }());
 }).call(this,require("buffer").Buffer)
+
 },{"buffer":"buffer","http":"http","https":"https","rsvp":34,"underscore":35,"url":"url","zlib":"zlib"}],92:[function(require,module,exports){
 var platform = require('../everlive.platform');
 var WebFileStore = require('./WebFileStore');
@@ -25678,12 +25794,13 @@ module.exports = (function () {
 
 var common = require('../common');
 var rsvp = common.rsvp;
+var utils = require('../utils');
 
 function NativeScriptFileStore(storagePath, options) {
     this.options = options;
     this.fs = require('file-system');
     this.dataDirectoryPath = this.fs.knownFolders.documents().path;
-    this.filesDirectoryPath = storagePath;
+    this.filesDirectoryPath = this.fs.path.join(this.dataDirectoryPath, storagePath);
 }
 
 NativeScriptFileStore.prototype = {
@@ -25693,10 +25810,13 @@ NativeScriptFileStore.prototype = {
         }
     },
 
-    removeFilesDirectory: function (directoryEntry) {
-        var filesDirectoryPath = this.fs.path.join(directoryEntry.path, this.filesDirectoryPath);
-        var filesDirectory = this.fs.Folder.fromPath(filesDirectoryPath);
-        return filesDirectory.remove();
+    removeFilesDirectory: function () {
+        var self = this;
+
+        return self.getFilesDirectory()
+            .then(function (filesDirectory) {
+                return filesDirectory.remove();
+            });
     },
 
     removeFile: function (fileEntry) {
@@ -25714,11 +25834,22 @@ NativeScriptFileStore.prototype = {
     getFile: function (path) {
         var self = this;
         return new rsvp.Promise(function (resolve, reject) {
-            self.resolveDataDirectory(function (directoryEntry) {
-                var fullFilePath = self.fs.path.join(directoryEntry.path, path);
-                var file = self.fs.File.fromPath(fullFilePath);
-                resolve(file);
-            }, reject);
+            self.resolveDataDirectory()
+                .then(function (directoryEntry) {
+                    var fullFilePath = self.fs.path.join(directoryEntry.path, path);
+                    var file = self.fs.File.fromPath(fullFilePath);
+                    resolve(file);
+                })
+                .catch(reject);
+        });
+    },
+
+    getFilesDirectory: function () {
+        var self = this;
+
+        return new rsvp.Promise(function (resolve) {
+            var filesDirectory = self.fs.Folder.fromPath(self.filesDirectoryPath);
+            resolve(filesDirectory);
         });
     },
 
@@ -25735,11 +25866,13 @@ NativeScriptFileStore.prototype = {
         var self = this;
 
         return new rsvp.Promise(function (resolve, reject) {
-            self.resolveDataDirectory(function (directoryEntry) {
-                var fileDirectoryPath = self.fs.path.join(directoryEntry.path, self.filesDirectoryPath);
-                self.fs.Folder.fromPath(fileDirectoryPath);
-                resolve();
-            });
+            self.resolveDataDirectory()
+                .then(function (directoryEntry) {
+                    var fileDirectoryPath = self.fs.path.join(directoryEntry.path, self.filesDirectoryPath);
+                    self.fs.Folder.fromPath(fileDirectoryPath);
+                    resolve();
+                })
+                .catch(reject);
         });
     },
 
@@ -25777,12 +25910,13 @@ NativeScriptFileStore.prototype = {
 };
 
 module.exports = NativeScriptFileStore;
-},{"../common":58,"file-system":"file-system"}],95:[function(require,module,exports){
+},{"../common":58,"../utils":99,"file-system":"file-system"}],95:[function(require,module,exports){
 'use strict';
 
 var EverliveError = require('../EverliveError').EverliveError;
 var common = require('../common');
 var rsvp = common.rsvp;
+var _ = common._;
 var utils = require('../utils');
 var platform = require('../everlive.platform');
 var path = require('path');
@@ -26198,14 +26332,13 @@ module.exports = (function () {
         },
 
         /**
-         * @memberOf Data.prototype
-         * @method
          * Modifies whether the query should be invoked on the offline storage.
-         * Default is true.
-         * Only valid when offlineStorage is enabled.
-         * @param useOffline
-         * @returns {Data}
-         * */
+         * @memberOf Data.prototype
+         * @method useOffline
+         * @name useOffline
+         * @param {boolean} [useOffline]
+         * @returns {Data} Returns the same instance of the Data object.
+         */
         useOffline: function (useOffline) {
             if (arguments.length !== 1) {
                 throw new Error('A single value is expected in useOffline() query modifier');
@@ -26214,11 +26347,11 @@ module.exports = (function () {
         },
 
         /**
-         * @memberOf Data.prototype
-         * @method
-         * @name ignoreCache
          * Does not use the cache when retrieving the data.
          * Only valid when caching is enabled.
+         * @memberOf Data.prototype
+         * @method ignoreCache
+         * @name ignoreCache
          * @returns {Data}
          * */
         ignoreCache: function () {
@@ -26226,11 +26359,11 @@ module.exports = (function () {
         },
 
         /**
-         * @memberOf Data.prototype
-         * @method
-         * @name forceCache
          * Forces the request to get the data from the cache even if the data is already expired.
          * Only valid when caching is enabled.
+         * @memberOf Data.prototype
+         * @method forceCache
+         * @name forceCache
          * @returns {Data}
          * */
         forceCache: function () {
@@ -26238,11 +26371,11 @@ module.exports = (function () {
         },
 
         /**
-         * @memberOf Data.prototype
-         * @method
-         * @name maxAge
-         * Sets cache expiration specifically for the current query
+         * Sets cache expiration specifically for the current query.
          * Only valid when caching is enabled.
+         * @memberOf Data.prototype
+         * @method maxAge
+         * @name maxAge
          * @param maxAgeInMinutes
          * @returns {Data}
          * */
@@ -26259,11 +26392,11 @@ module.exports = (function () {
         },
 
         /**
-         * @memberOf Data.prototype
-         * @method
-         * Modifies whether the query should invoke the {{@link Authentication.prototype.hasAuthenticationRequirement}}.
+         * Modifies whether the query should try to authenticate if the security token has expired.
          * Default is false.
-         * Only valid when authentication module has an onAuthenticationRequired function .
+         * Only valid when the authentication module has an onAuthenticationRequired function.
+         * @memberOf Data.prototype
+         * @method skipAuth
          * @param skipAuth
          * @returns {Data}
          * */
@@ -26279,7 +26412,7 @@ module.exports = (function () {
          * Default is true.
          * Only valid when offlineStorage is enabled.
          * @memberOf Data.prototype
-         * @method
+         * @method applyOffline
          * @param applyOffline
          * @returns {Data}
          * */
@@ -26291,9 +26424,9 @@ module.exports = (function () {
         },
 
         /**
-         * Sets additional non-standard HTTP headers in the current data request. See [List of Non-Standard HTTP Headers]{{% slug rest-api-headers}} for more information.
+         * Sets additional non-standard HTTP headers in the current data request. See [List of Request Parameters](http://docs.telerik.com/platform/backend-services/rest/apireference/RESTfulAPI/custom_headers) for more information.
          * @memberOf Data.prototype
-         * @method
+         * @method withHeaders
          * @param {object} headers Additional headers to be sent with the data request.
          * @returns {Data}
          */
@@ -26303,8 +26436,8 @@ module.exports = (function () {
         /**
          * Sets an expand expression to be used in the data request. This allows you to retrieve complex data sets using a single query based on relations between data types.
          * @memberOf Data.prototype
-         * @method
-         * @param {object} expandExpression An [expand expression]({% slug features-data-relations-defining-expand %}) definition.
+         * @method expand
+         * @param {object} expandExpression An [expand expression](http://docs.telerik.com/platform/backend-services/rest/data/relations/relations-defining) definition.
          * @returns {Data}
          */
         expand: function (expandExpression) {
@@ -26384,13 +26517,6 @@ module.exports = (function () {
             requestOptions.headers[constants.Headers.sdk] = JSON.stringify(sdkHeaderValue);
         },
 
-        /**
-         * Processes a query with all of its options. Applies the operation online/offline
-         * @param {DataQuery} query The query to process
-         * @private
-         * @param {DataQuery} query
-         * @returns {Promise}
-         */
         processDataQuery: function (query) {
             var self = this;
 
@@ -26452,7 +26578,7 @@ module.exports = (function () {
          * @memberOf Data.prototype
          * @method get
          * @name get
-         * @param {object|null} filter A [filter expression]({% slug rest-api-querying-filtering %}) definition.
+         * @param {object|null} filter A [filter expression](http://docs.telerik.com/platform/backend-services/rest/queries/queries-filtering) definition.
          * @returns {Promise} The promise for the request.
          */
         /**
@@ -26460,7 +26586,7 @@ module.exports = (function () {
          * @memberOf Data.prototype
          * @method get
          * @name get
-         * @param {object|null} filter A [filter expression]({% slug rest-api-querying-filtering %}) definition.
+         * @param {object|null} filter A [filter expression](http://docs.telerik.com/platform/backend-services/rest/queries/queries-filtering) definition.
          * @param {Function} [success] A success callback.
          * @param {Function} [error] An error callback.
          */
@@ -26524,7 +26650,7 @@ module.exports = (function () {
          * @memberOf Data.prototype
          * @method count
          * @name count
-         * @param {object|null} filter A [filter expression]({% slug rest-api-querying-filtering %}) definition.
+         * @param {object|null} filter A [filter expression](http://docs.telerik.com/platform/backend-services/rest/queries/queries-filtering) definition.
          * @returns {Promise} The promise for the request.
          */
         /**
@@ -26532,7 +26658,7 @@ module.exports = (function () {
          * @memberOf Data.prototype
          * @method count
          * @name count
-         * @param {object|null} filter A [filter expression]({% slug rest-api-querying-filtering %}) definition.
+         * @param {object|null} filter A [filter expression](http://docs.telerik.com/platform/backend-services/rest/queries/queries-filtering) definition.
          * @param {Function} [success] A success callback.
          * @param {Function} [error] An error callback.
          */
@@ -26592,7 +26718,7 @@ module.exports = (function () {
          * @method rawUpdate
          * @name rawUpdate
          * @param {object} updateObject Update object that contains the new values.
-         * @param {object|null} filter A [filter expression]({% slug rest-api-querying-filtering %}) definition.
+         * @param {object|null} filter A [filter expression](http://docs.telerik.com/platform/backend-services/rest/queries/queries-filtering) definition.
          * @returns {Promise} The promise for the request.
          */
         /**
@@ -26601,7 +26727,7 @@ module.exports = (function () {
          * @method rawUpdate
          * @name rawUpdate
          * @param {object} updateObject Update object that contains the new values.
-         * @param {object|null} filter A [filter expression]({% slug rest-api-querying-filtering %}) definition.
+         * @param {object|null} filter A [filter expression](http://docs.telerik.com/platform/backend-services/rest/queries/queries-filtering) definition.
          * @param {Function} [success] A success callback.
          * @param {Function} [error] An error callback.
          */
@@ -26693,7 +26819,7 @@ module.exports = (function () {
          * @method update
          * @name update
          * @param {object} updateObject The update object.
-         * @param {object|null} filter A [filter expression]({% slug rest-api-querying-filtering %}) definition.
+         * @param {object|null} filter A [filter expression](http://docs.telerik.com/platform/backend-services/rest/queries/queries-filtering) definition.
          * @returns {Promise} The promise for the request.
          */
         /**
@@ -26702,7 +26828,7 @@ module.exports = (function () {
          * @method update
          * @name update
          * @param {object} model The update object.
-         * @param {object|null} filter A [filter expression]({% slug rest-api-querying-filtering %}) definition.
+         * @param {object|null} filter A [filter expression](http://docs.telerik.com/platform/backend-services/rest/queries/queries-filtering) definition.
          * @param {Function} [success] A success callback.
          * @param {Function} [error] An error callback.
          */
@@ -26753,7 +26879,7 @@ module.exports = (function () {
          * @memberOf Data.prototype
          * @method destroy
          * @name destroy
-         * @param {object|null} filter A [filter expression]({% slug rest-api-querying-filtering %}) definition.
+         * @param {object|null} filter A [filter expression](http://docs.telerik.com/platform/backend-services/rest/queries/queries-filtering) definition.
          * @returns {Promise} The promise for the request.
          */
         /**
@@ -26761,7 +26887,7 @@ module.exports = (function () {
          * @memberOf Data.prototype
          * @method destroy
          * @name destroy
-         * @param {object|null} filter A [filter expression]({% slug rest-api-querying-filtering %}) definition.
+         * @param {object|null} filter A [filter expression](http://docs.telerik.com/platform/backend-services/rest/queries/queries-filtering) definition.
          * @param {Function} [success] A success callback.
          * @param {Function} [error] An error callback.
          */
@@ -26928,7 +27054,7 @@ module.exports = (function () {
         /**
          * Checks if the specified data item is new or not.
          * @memberOf Data.prototype
-         * @method
+         * @method isNew
          * @param model Item to check.
          * @returns {boolean}
          */
@@ -27059,18 +27185,85 @@ module.exports.addFilesFunctions = function addFilesFunctions(ns) {
         }, success, error);
     };
 
+    /**
+     * Downloads a file to the device's file system. Wraps the Apache Cordova "download()" [FileTransfer](http://cordova.apache.org/docs/en/2.7.0/cordova_file_file.md.html#FileTransfer) method. Note that the signatures of these methods differ.
+     * @memberof Files.prototype
+     * @method download
+     * @param {string} fileToDownload A Backend Services File ID.
+     * @param {string} pathOnDevice An Apache Cordova FileSystem URL representing the local path on the device where the downloaded file will be saved. Maps to the "target" FileTransfer plugin parameter.
+     * @param {object} [options] Additional request options. Maps to the "options" FileTransfer plugin parameter.
+     * @param {object} [options.headers] A JSON object containing headers to send along with the request.
+     * @param {boolean} [trustAllHosts=false] Whether to accept all security certificates including self-signed certificates. Maps to the "trustAllHosts" FileTransfer plugin parameter.
+     * @returns {Promise} The promise for the request.
+     */
+    /**
+     * Downloads a file to the device's file system. Wraps the Apache Cordova "download()" [FileTransfer](http://cordova.apache.org/docs/en/2.7.0/cordova_file_file.md.html#FileTransfer) method. Note that the signatures of these methods differ.
+     * @memberof Files.prototype
+     * @method download
+     * @param {string} fileToDownload A Backend Services File ID.
+     * @param {string} pathOnDevice An Apache Cordova FileSystem URL representing the local path on the device where the downloaded file will be saved. Maps to the "target" FileTransfer plugin parameter.
+     * @param {object} [options] Additional request options. Maps to the "options" FileTransfer plugin parameter.
+     * @param {object} [options.headers] A JSON object containing headers to send along with the request.
+     * @param {boolean} [trustAllHosts=false] Whether to accept all security certificates including self-signed certificates. Maps to the "trustAllHosts" FileTransfer plugin parameter.
+     * @param {Function} [success] A success callback that is passed an Apache Cordova [FileEntry](https://cordova.apache.org/docs/en/3.3.0/cordova_file_file.md.html#FileEntry) object. Maps to the "successCallback" FileTransfer plugin parameter.
+     * @param {Function} [error] An error callback that is passed an Apache Cordova [FileTransferError](https://github.com/apache/cordova-plugin-file-transfer#filetransfererror) object. Maps to the "errorCallback" FileTransfer plugin parameter.
+     */
     ns.download = function (url, localPath, options, trustAllHosts, success, error) {
+        var self = this;
+
         return buildPromise(function (success, error) {
             if (!trustAllHosts) {
                 trustAllHosts = false;
             }
 
+            var headers = options && options.headers ? options.headers : {};
+
             var fileTransfer = new FileTransfer();
-            fileTransfer.download(url, localPath, success, error, trustAllHosts, options);
+            self.withHeaders(headers)
+                .getById(url)
+                .then(function (res) {
+                    var file = res.result;
+                    url = file.Uri;
+                    fileTransfer.download(url, localPath, success, error, trustAllHosts, options);
+                }, error);
         }, success, error);
     };
 
-    ns.upload = function (localPath, url, options, trustAllHosts, success, error) {
+    /**
+     * Uploads a file from the device's file system to Backend Services. Wraps the Apache Cordova "upload()" [FileTransfer](http://cordova.apache.org/docs/en/2.7.0/cordova_file_file.md.html#FileTransfer) method. Note that the signatures of these methods differ.
+     * @memberof Files.prototype
+     * @method upload
+     * @param {string} fileToUpload An Apache Cordova FileSystem URL representing the full path to the file on the device.
+     * @param {object} [options] Additional request options. Maps to the "options" FileTransfer plugin parameter.
+     * @param {string} [options.fileKey] The name of the form element. Defaults to 'file' in the FileTransfer plugin parameter.
+     * @param {string} [options.fileName] The file name to use when uploading the file. Defaults to 'image.jpg' in the FileTransfer plugin.
+     * @param {string} [options.httpMethod] The HTTP method to use, either POST or PUT. Defaults to 'POST' in the FileTransfer plugin parameter.
+     * @param {string} [options.mimeType] The mime type of the uploaded data. Defaults to 'image/jpeg' in the FileTransfer plugin parameter.
+     * @param {object} [options.params] A set of optional key/value pairs to pass in the HTTP request.
+     * @param {boolean} [options.chunkedMode] Whether to upload the data in chunked streaming mode. Defaults to 'true' in the FileTransfer plugin parameter.
+     * @param {object} [options.headers] A JSON object for the headers to send along with the request.
+     * @param {boolean} [trustAllHosts=false] Whether to accept all security certificates including self-signed certificates. Maps to the "trustAllHosts" FileTransfer plugin parameter.
+     * @returns {Promise} The promise for the request.
+     */
+    /**
+     * Uploads a file from the device's file system to Backend Services. Wraps the Apache Cordova "upload()" [FileTransfer](http://cordova.apache.org/docs/en/2.7.0/cordova_file_file.md.html#FileTransfer) method. Note that the signatures of these methods differ.
+     * @memberof Files.prototype
+     * @method upload
+     * @param {string} fileToUpload An Apache Cordova FileSystem URL representing the full path to the file on the device.
+     * @param {object} [options] Additional request options. Maps to the "options" FileTransfer plugin parameter.
+     * @param {string} [options.fileKey] The name of the form element. Defaults to 'file' in the FileTransfer plugin parameter.
+     * @param {string} [options.fileName] The file name to use when uploading the file. Defaults to 'image.jpg' in the FileTransfer plugin parameter.
+     * @param {string} [options.httpMethod] The HTTP method to use, either POST or PUT. Defaults to 'POST' in the FileTransfer plugin parameter.
+     * @param {string} [options.mimeType] The mime type of the uploaded data. Defaults to 'image/jpeg' in the FileTransfer plugin parameter.
+     * @param {object} [options.params] A set of optional key/value pairs to pass in the HTTP request.
+     * @param {boolean} [options.chunkedMode] Whether to upload the data in chunked streaming mode. Defaults to 'true' in the FileTransfer plugin parameter.
+     * @param {object} [options.headers] A JSON object for the headers to send along with the request.
+     * @param {boolean} [trustAllHosts=false] Whether to accept all security certificates including self-signed certificates. Maps to the "trustAllHosts" FileTransfer plugin parameter.
+     * @param {Function} [success] A success callback that is passed an Apache Cordova [FileUploadResult](https://github.com/apache/cordova-plugin-file-transfer#fileuploadresult) object. Maps to the "successCallback" FileTransfer plugin parameter.
+     * @param {Function} [error] An error callback that is passed an Apache Cordova [FileTransferError](https://github.com/apache/cordova-plugin-file-transfer#filetransfererror) object. Maps to the "errorCallback" FileTransfer plugin parameter.
+     */
+    ns.upload = function (localPath, options, trustAllHosts, success, error) {
+        var url = this.getUploadUrl();
         return buildPromise(function (success, error) {
             if (!trustAllHosts) {
                 trustAllHosts = false;
@@ -27132,14 +27325,14 @@ module.exports.addUsersFunctions = function addUsersFunctions(ns, everlive) {
     };
 
     /**
-     * Gets information about the user that is currently authenticated to the {{site.bs}} JavaScript SDK. The success function is called with {@link Users.ResultTypes.curentUserResult}.
+     * Gets information about the user that is currently authenticated to the {{site.bs}} JavaScript SDK. The success function is called with {@link Users.ResultTypes.currentUserResult}.
      * @memberOf Users.prototype
      * @method currentUser
      * @name currentUser
      * @returns {Promise} The promise for the request.
      */
     /**
-     * Gets information about the user that is currently authenticated to the {{site.bs}} JavaScript SDK. The success function is called with {@link Users.ResultTypes.curentUserResult}.
+     * Gets information about the user that is currently authenticated to the {{site.bs}} JavaScript SDK. The success function is called with {@link Users.ResultTypes.currentUserResult}.
      * @memberOf Users.prototype
      * @method currentUser
      * @name currentUser
@@ -28075,11 +28268,11 @@ utils.buildUrl = function (setup) {
 utils.getDbOperators = function (expression, shallow) {
     var dbOperators = [];
 
-    if (typeof expression === 'string') {
+    if (typeof expression === 'string' || typeof expression === 'number') {
         return dbOperators;
     }
 
-    var modifierKeys = Object.keys(expression);
+    var modifierKeys = Object.keys(expression || {});
     _.each(modifierKeys, function (key) {
         if (key.indexOf('$') === 0) {
             dbOperators.push(key);
@@ -28253,7 +28446,21 @@ utils.getId = function (obj) {
     return obj.Id || obj._id || obj.id;
 };
 
+utils.lazyRequire = function (moduleName, exportName) {
+    exportName = exportName || moduleName;
+    var obj = {};
+
+    Object.defineProperty(obj, exportName, {
+        get: function () {
+            return require(moduleName);
+        }
+    });
+
+    return obj;
+};
+
 module.exports = utils;
 
-},{"./Everlive":46,"./EverliveError":47,"./common":58,"./everlive.platform":61,"path":3}]},{},[66]);
-}())
+},{"./Everlive":46,"./EverliveError":47,"./common":58,"./everlive.platform":61,"path":3}]},{},[66])(66)
+});
+//# sourceMappingURL=everlive.map
