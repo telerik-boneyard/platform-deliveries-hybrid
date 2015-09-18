@@ -1,12 +1,3 @@
----
-title: "Telerik Deliveries Sample App for PhoneGap/Cordova"
-slug: sample-backend-services-deliveries-hybrid
-position: 1
-publish: true
-page_title: Telerik Friends Sample App for Windows Phone | Telerik Platform
-description: 
-tags: Sample App, Application, Windows Phone, C#, dotnet, .NET, BaaS, mBaaS, Social, Analytics, Social Login
----
 
 # Telerik Deliveries Sample App for PhoneGap/Cordova
 
