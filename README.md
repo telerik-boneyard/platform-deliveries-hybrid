@@ -27,7 +27,7 @@ Similarly to all other Telerik hybrid apps, Telerik Deliveries runs on iOS, Andr
 
 ## Screenshots
 
-Login Screen|Activity Stream|Activity Details
+Login Screen|Main Menu|All Orders, Offline
 ---|---|---
 ![Login Screen](https://raw.githubusercontent.com/telerik/platform-deliveries-hybrid/master/screenshots/login-screen.png)|![Main Menu](https://raw.githubusercontent.com/telerik/platform-deliveries-hybrid/master/screenshots/main-menu.png)|![All Orders, device is offline](https://raw.githubusercontent.com/telerik/platform-deliveries-hybrid/master/screenshots/all-orders-offline.png)
 
