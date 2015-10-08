@@ -5,7 +5,7 @@
   "AppIdentifier": "com.telerik.PushNotificationApp",
   "DisplayName": "Deliveries",
   "Author": "",
-  "Description": "",
+  "Description": "Deliveries",
   "BundleVersion": "1.0",
   "AndroidVersionCode": "1",
   "iOSDeviceFamily": [
