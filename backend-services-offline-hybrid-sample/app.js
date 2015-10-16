@@ -22,6 +22,7 @@
             });
 
             onConnectivityChanged(app.isOnline());
+            app.models.deliveriesView.init();
         });
     };
 
