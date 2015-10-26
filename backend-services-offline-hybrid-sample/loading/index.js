@@ -11,8 +11,9 @@ app.models.loading = (function() {
         $('#' + sectionId).show();
     };
     
-    var _isApiKeySet = function() {
-        return Config.ApiKey && Config.ApiKey.length === 16;
+    var _isAppIdSet = function() {
+        //TODO:
+        return Config.AppId && Config.AppId.length === 16;
     };
     
     var _isMasterKeySet = function() {
@@ -68,7 +69,7 @@ app.models.loading = (function() {
         var fields = typeDefinition.Fields;
         delete typeDefinition.Fields;
         
-        var url = everliveBaseUrl + 'Metadata/Applications/' + Config.ApiKey + '/Types';
+        var url = everliveBaseUrl + 'Metadata/Applications/' + Config.AppId + '/Types';
         return _ajaxRequestPromise(url, typeDefinition)
             .then(
                 function() {
@@ -78,25 +79,25 @@ app.models.loading = (function() {
     };
     
     var _createContentTypeFields = function(typeName, fields) {
-        var url = everliveBaseUrl + 'Metadata/Applications/' + Config.ApiKey + '/Types/' + typeName + '/Fields';
+        var url = everliveBaseUrl + 'Metadata/Applications/' + Config.AppId + '/Types/' + typeName + '/Fields';
         return _ajaxRequestPromise(url, fields);
     };
     
     var _createData = function() {
         var data = sampleData.Data.DeliveryOrder;
-        var url = everliveBaseUrl + Config.ApiKey + '/DeliveryOrder';
+        var url = everliveBaseUrl + Config.AppId + '/DeliveryOrder';
         return _ajaxRequestPromise(url, data);
     };
     
     var _createUsers = function() {
         var users = sampleData.Users;
-        var url = everliveBaseUrl + Config.ApiKey + '/Users';
+        var url = everliveBaseUrl + Config.AppId + '/Users';
         return _ajaxRequestPromise(url, users);
     };
     
     var _createFiles = function() {
         var files = sampleData.Data.Files;
-        var url = everliveBaseUrl + Config.ApiKey + '/Files';
+        var url = everliveBaseUrl + Config.AppId + '/Files';
         return _ajaxRequestPromise(url, files[0])
         .then(function() {
             return _ajaxRequestPromise(url, files[1]);
@@ -140,8 +141,8 @@ app.models.loading = (function() {
     return {
         onShow: function() {
             //Check if API key has been set
-            var apiKeySet = _isApiKeySet();
-            if (!apiKeySet) {
+            var appIdIsSet = _isAppIdSet();
+            if (!appIdIsSet) {
                 _showSection('error-no-api-key');
             } else {
                 var isOnline = app.isOnline();
