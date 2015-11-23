@@ -44,14 +44,14 @@ Ensure that you can log in to a Telerik Platform account. This can be a free tri
 
 The Deliveries sample app comes fully functional, but to see it in action you must link it to your own Telerik Platform account.
 
-To do that, set the App Id for your Telerik project. This is a unique string that links the sample mobile app to a project in Telerik Backend Services where all the data is read from/saved.
+To do that, set the App ID for your Telerik project. This is a unique string that links the sample mobile app to a project in Telerik Backend Services where all the data is read from/saved.
 
 1. Click the "Try in AppBuilder" button to clone the repository in AppBuilder.<br>
 	An app called "My App" is created for you with an AppBuilder project set up.
 2. Click **My App** in the navigation bar at the top to go the app home.
 3. Create a Backend Services project.
 4. Once the Backend Services project is ready, go to **Overview > App ID & Tokens**.
-5. Take note of your App Id and API Master Key.
+5. Take note of your App ID and API Master Key.
 6. Go back to the AppBuilder project.
 3. Open the `config.js` file.
 4. Set the `Config.AppId` value to the App ID of your Telerik project.
