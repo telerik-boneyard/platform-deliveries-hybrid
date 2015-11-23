@@ -8,7 +8,7 @@
 * [Configuration](#configuration)
 * [Running the Sample](#running-the-sample)
 
-## Overview
+# Overview
 
 This repository contains the Telerik Deliveries app for PhoneGap/Cordova. It is a sample mobile app demonstrating how to integrate and use the [Offline Support](http://docs.telerik.com/platform/backend-services/javascript/offline-support/introduction) and [Caching](http://docs.telerik.com/platform/backend-services/javascript/caching/introduction) features provided by the [Telerik Backend Services JavaScript SDK](http://docs.telerik.com/platform/backend-services/javascript/getting-started-javascript-sdk).
 
@@ -25,13 +25,13 @@ The detailed list of showcased features includes:
 
 Similarly to all other Telerik hybrid apps, Telerik Deliveries runs on iOS, Android, and Windows Phone 8.
 
-## Screenshots
+# Screenshots
 
 Login Screen|Main Menu|All Orders, Offline
 ---|---|---
 ![Login Screen](https://raw.githubusercontent.com/telerik/platform-deliveries-hybrid/master/screenshots/login-screen.png)|![Main Menu](https://raw.githubusercontent.com/telerik/platform-deliveries-hybrid/master/screenshots/main-menu.png)|![All Orders, device is offline](https://raw.githubusercontent.com/telerik/platform-deliveries-hybrid/master/screenshots/all-orders-offline.png)
 
-## Requirements
+# Requirements
 
 Before you begin, you need to ensure that you have the following:
 
@@ -40,7 +40,7 @@ Ensure that you can log in to a Telerik Platform account. This can be a free tri
 
 - **Telerik AppBuilder** The sample app requires Telerik AppBuilder to run. This can be the in-browser client, the desktop client or the extension for Visual Studio.
 
-## Configuration
+# Configuration
 
 The Deliveries sample app comes fully functional, but to see it in action you must link it to your own Telerik Platform account.
 
@@ -57,7 +57,7 @@ To do that, set the API Key for your Telerik Backend Services project. This is a
 4. Set the `Config.ApiKey` value to the API key of your Backend Services project.
 5. Set the `Config.MasterKey` value to the API Master Key of your Backend Services project.
 
-## Running the Sample
+# Running the Sample
 
 Once the app is configured, you can run it either on a real device or in the Telerik AppBuilder simulator.
 
