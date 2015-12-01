@@ -50,8 +50,8 @@ To do that, set the App ID for your Telerik project. This is a unique string tha
 	An app called "My App" is created for you with an AppBuilder project set up.
 2. Click **My App** in the navigation bar at the top to go the app home.
 3. Create a Backend Services project.
-4. Once the Backend Services project is ready, go to **Overview > App ID & Tokens**.
-5. Take note of your App ID and API Master Key.
+4. Once the Backend Services project is ready, go to **App ID & Tokens**.
+5. Take note of your App ID and API Master Key (Enable Data to get a master key).
 6. Go back to the AppBuilder project.
 3. Open the `config.js` file.
 4. Set the `Config.AppId` value to the App ID of your Telerik project.
