@@ -12,7 +12,6 @@ app.models.loading = (function() {
     };
     
     var _isAppIdSet = function() {
-        //TODO:
         return Config.AppId && Config.AppId.length === 16;
     };
     
