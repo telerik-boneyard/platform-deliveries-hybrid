@@ -1,7 +1,7 @@
 
 # Telerik Deliveries Sample App for PhoneGap/Cordova
 
-<a href="https://platform.telerik.com/#appbuilder/clone/https://github.com/telerik/platform-deliveries-hybrid" target="_blank"><img src="http://docs.telerik.com/platform/samples/images/try-in-appbuilder.png" alt="Try in AppBuilder" title="Try in Telerik Platform" /></a> <a href="https://github.com/telerik/platform-deliveries-hybrid" target="_blank"><img style="padding-left:20px" src="http://docs.telerik.com/platform/samples/images/get-github.png" alt="Get from GitHub" title="Get from GitHub"></a>
+<a href="https://platform.telerik.com/#appbuilder/clone/https://github.com/telerik/platform-deliveries-hybrid" target="_blank"><img src="http://docs.telerik.com/platform/samples/images/try-in-appbuilder.png" alt="Try in AppBuilder" title="Try in Telerik Platform" /></a>
 
 <a id="top"></a>
 * [Overview](#overview)
@@ -11,7 +11,7 @@
 
 # Overview
 
-This repository contains the Telerik Deliveries app for PhoneGap/Cordova. It is a sample mobile app demonstrating how to integrate and use the [Offline Support](http://docs.telerik.com/platform/backend-services/javascript/offline-support/introduction) and [Caching](http://docs.telerik.com/platform/backend-services/javascript/caching/introduction) features provided by the [Telerik Backend Services JavaScript SDK](http://docs.telerik.com/platform/backend-services/javascript/getting-started-javascript-sdk).
+This repository contains the Telerik Deliveries app for PhoneGap/Cordova. It is a sample mobile app demonstrating how to integrate and use the [Offline Support](http://docs.telerik.com/platform/backend-services/javascript/offline-support/introduction) and [Caching](http://docs.telerik.com/platform/backend-services/javascript/caching/introduction) features provided by the [Telerik Platform Backend Services JavaScript SDK](http://docs.telerik.com/platform/backend-services/javascript/getting-started-javascript-sdk).
 
 The detailed list of showcased features includes:
 
@@ -24,7 +24,7 @@ The detailed list of showcased features includes:
 * Caching
 * Authentication Persistence
 
-Similarly to all other Telerik hybrid apps, Telerik Deliveries runs on iOS, Android, and Windows Phone 8.
+Similarly to all other Telerik Platform hybrid apps, Telerik Deliveries runs on iOS, Android, and Windows Phone 8.
 
 # Screenshots
 
@@ -43,30 +43,27 @@ Ensure that you can log in to a Telerik Platform account. This can be a free tri
 
 # Configuration
 
-The Deliveries sample app comes fully functional, but to see it in action you must link it to your own Telerik Platform account.
+The Deliveries sample app comes fully functional, but to see it in action you must link it to a Telerik Platform app.
 
-To do that, set the App ID for your Telerik project. This is a unique string that links the sample mobile app to a project in Telerik Backend Services where all the data is read from/saved.
-
-1. Click the "Try in AppBuilder" button to clone the repository in AppBuilder.<br>
-	An app called "My App" is created for you with an AppBuilder project set up.
-2. Click **My App** in the navigation bar at the top to go the app home.
-3. Create a Backend Services project.
-4. Once the Backend Services project is ready, go to **App ID & Tokens**.
-5. Take note of your App ID and API Master Key (Enable Data to get a master key).
-6. Go back to the AppBuilder project.
+1. Click the **Run in the Platform** button to clone the repository in Telerik Platform.<br>
+	A new Telerik Platform app is created for you. You can view the app source code on the Code tab.
+2. Click the **Data** tab and then click **Enable Data**.
+4. Click the **Settings** tab.
+5. Take note of your **App ID** and **API Master Key**.
+6. Go back to **Code**.
 3. Open the `config.js` file.
-4. Set the `Config.AppId` value to the App ID of your Telerik project.
-5. Set the `Config.MasterKey` value to the API Master Key of your Backend Services project.
+4. Set the `Config.AppId` value to the App ID that you acquired earlier.
+5. Set the `Config.MasterKey` value to the API Master Key that you acquired earlier.
 
 # Running the Sample
 
-Once the app is configured, you can run it either on a real device or in the Telerik AppBuilder simulator.
+Once the app is configured, you can run it either on a real device or in the Telerik Platform simulator.
 
 To run it, follow the steps in the product's documentation: [Running Apps on Devices](http://docs.telerik.com/platform/appbuilder/testing-your-app/running-on-devices/working-with-devices).
 
-After you run the app successfully, it guides you through a data initialization process which builds the necessary data structure in your Backend Services project and then creates sample data.
+After you run the app successfully, it guides you through a data initialization process which builds the necessary data structure in your Telerik Platform app and then creates sample data.
 
-For your convenience, the app always displays whether it works online or offline. You can simulate lack of Internet connection from the AppBuilder simulator. If you are testing on a device, you have to turn off the WiFi and the data connection to go in offline mode.
+For your convenience, the app always displays whether it works online or offline. You can simulate lack of Internet connection from the Telerik Platform simulator. If you are testing on a device, you have to turn off the WiFi and the data connection to go in offline mode.
 
 > Ensure that the emulator or the device that you are using has Internet connectivity when running the sample.
 
