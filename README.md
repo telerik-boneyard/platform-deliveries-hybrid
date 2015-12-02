@@ -8,6 +8,7 @@
 * [Requirements](#requirements)
 * [Configuration](#configuration)
 * [Running the Sample](#running-the-sample)
+* [Testing the Sample](#test-the-sample)
 
 # Overview
 
@@ -62,6 +63,8 @@ Once the app is configured, you can run it either on a real device or in the Tel
 To run it, follow the steps in the product's documentation: [Running Apps on Devices](http://docs.telerik.com/platform/appbuilder/testing-your-app/running-on-devices/working-with-devices).
 
 After you run the app successfully, it guides you through a data initialization process which builds the necessary data structure in your Telerik Platform app and then creates sample data.
+
+# Testing the Sample
 
 For your convenience, the app always displays whether it works online or offline. You can simulate lack of Internet connection from the Telerik Platform simulator. If you are testing on a device, you have to turn off the WiFi and the data connection to go in offline mode.
 
