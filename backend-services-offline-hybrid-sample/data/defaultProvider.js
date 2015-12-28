@@ -3,7 +3,7 @@
 (function() {
     //create a reference for the data provider to be used throughout the app
     app.data.defaultprovider = new Everlive({
-        appId: Config.AppId,
+        apiKey: Config.AppId, // new - does not work offline with appId after 1.5.1
         scheme: 'https',
         offlineStorage: true,
         caching: true,

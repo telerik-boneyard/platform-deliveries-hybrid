@@ -11,8 +11,8 @@ app.models.signInView = (function() {
     return {
         onShow: function() {
             var isOnline = app.isOnline();
-            
-            dataProvider.Users.currentUser().then(
+            // new - do not cache current user call
+            dataProvider.Users.ignoreCache().currentUser().then(
                 function(data) {
                     var currentUser = data.result;
                     if (currentUser) {
