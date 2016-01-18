@@ -7,7 +7,6 @@ app.models.home = (function () {
 			var dataProvider = app.data.defaultprovider;
 			dataProvider.Users.ignoreCache().currentUser(
 				function (data) {
-					// new - check if the current user is not null
 					var currentUser = data.result;
 					if (currentUser) {
 						app.models.home.homeView.viewModel.set("userName", data.result.DisplayName);
