@@ -1,5 +1,5 @@
 'use strict';
-var everliveBaseUrl = 'https://api.everlive.com/v1/'; // new - use https 
+var everliveBaseUrl = 'https://api.everlive.com/v1/'; // use https 
 app.models.loading = (function () {
 	var dataProvider = app.data.defaultprovider;
 
@@ -26,8 +26,7 @@ app.models.loading = (function () {
 				_showLoginPage();
 			},
 			function (error) {
-				debugger;
-				// new - check for invalid app id as well
+				// check for invalid app id
 				if (error.code === 607) {
 					_showSection('error-no-api-key');
 				} else if (!_isMasterKeySet()) { // why do we have to check for master key here?
@@ -131,7 +130,7 @@ app.models.loading = (function () {
 		};
 
 		var promise = new RSVP.Promise(function (resolve, reject) {
-			$.ajax($.extend({}, // new - make the ajax request rsvp compatible
+			$.ajax($.extend({}, // make the ajax request rsvp compatible
 				ajaxOptions, {}, {
 					success: function (json) {
 						resolve(json);
