@@ -38,7 +38,6 @@ app.models.deliveriesView = {
                     }
                     
                     app.models.deliveriesView.deliveriesViewList.viewModel.dataSource.filter(currentFilter);    
-                    debugger;
                     app.models.deliveriesView.deliveriesViewList.viewModel.dataSource.read();
                 },
                 onHide: function() {
@@ -64,7 +63,7 @@ app.models.deliveriesView = {
                 if (app.data.defaultprovider.isOnline()) {
                     headers["X-Everlive-Expand"] = JSON.stringify({
                         Image: {
-                            TargetTypeName: 'System.Files', // new 
+                            TargetTypeName: 'System.Files', 
                             ReturnAs: 'DeliveryImage'
                         }
                     });
