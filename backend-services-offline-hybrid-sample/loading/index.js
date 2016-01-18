@@ -29,7 +29,7 @@ app.models.loading = (function () {
 				// check for invalid app id
 				if (error.code === 607) {
 					_showSection('error-no-api-key');
-				} else if (!_isMasterKeySet()) { // why do we have to check for master key here?
+				} else if (!_isMasterKeySet()) { // check for master key here
 					_showSection('error-no-master-key');
 				} else {
 					_showSection('initialize-data');
@@ -52,7 +52,7 @@ app.models.loading = (function () {
 			.then(function () {
 				_showSection('initialize-data-completed');
 			})
-			.catch(function (e) { // new - this wasn't catching the server errors
+			.catch(function (e) { // this wasn't catching the server errors
 				alert('Data initialization error: ' + JSON.stringify(e));
 			});
 
