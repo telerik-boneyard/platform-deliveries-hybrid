@@ -243,6 +243,14 @@
   display: none;
 }
 
+.app-footer {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  z-index: 1000;
+  background-color: #000;
+}
+
 .status-online strong {
   color: #008000;
 }
@@ -354,7 +362,7 @@
 .km-on-wp.km-app .km-icon:after,
 .km-on-wp.km-app .km-filter-wrap:before,
 .km-on-wp.km-app .km-state-active .km-icon:after {
-	background-image: url("../images/wp8_inverseicons.png");
+  background-image: url("../images/wp8_inverseicons.png");
 }
 
 #kendo-ui-mobile-app.km-on-wp.km-app .km-icon.km-save:after,
