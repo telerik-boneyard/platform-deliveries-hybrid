@@ -1,68 +1,33 @@
 {
-	variables: {
+	"variables": {
 		"ActivitiesTypeId": "{guid}"
 	},
-	actions: [
+	"actions": [
 		{
-			type: "enable-ab"
+			"type": "enable-ab"
 		},
 		{
-			type: "enable-bs",
-			templates: ["Friends"]
+			"type": "enable-bs",
+			"templates": ["Friends"]
 		},
 		{
-			type: "bs-create-type",
+			"type": "bs-create-type",
 			
-		    Id: "{{ActivitiesTypeId}}",
-			Name: "Activities",
-			Title: "Activities",
-			SecurityPolicy: 1,
-            DisplayFieldName: "Text",
-			Fields: [
-				{
-					Name: "Text",
-					Title: "Text",
-					DataType: DataType.Text,
-					IsArray: false,
-					TargetTypeId: null
-				},
-				{
-					Name: "Picture",
-					Title: "Picture",
-					DataType: DataType.File,
-					IsArray: false,
-					TargetTypeId: null
-				},
-				{
-					Name: "UserId",
-					Title: "UserId",
-					DataType: DataType.Relation,
-					IsArray: false,
-					TargetTypeId: Utils.getTypeId('Users')
-				},
-				{
-				    Name: "Location",
-				    Title: "Location",
-				    DataType: DataType.GeoPoint,
-					IsArray: false,
-					TargetTypeId: null
-				},
-				{
-				    Name: "Likes",
-				    Title: "Likes",
-				    DataType: DataType.Relation,
-				    IsArray: true,
-				    TargetTypeId: Utils.getTypeId('Users')
-				},
+		    	"Id": "{{ActivitiesTypeId}}",
+			"Name": "Activities",
+			"Title": "Activities",
+			"SecurityPolicy": 1,
+    			"DisplayFieldName": "Text",
+			"Fields": [
 			],
 		},
 		{
-			type: "request",
-			method: "",
-			url: "",	//Can be relative to platform.telerik.com or absolute
-			headers: {...},
-			body: "",
-			message: "Generating users"
+			"type": "request",
+			"method": "",
+			"url": "",
+			"headers": {...},
+			"body": "",
+			"message": "Generating users"
 		}
 	]
 }
