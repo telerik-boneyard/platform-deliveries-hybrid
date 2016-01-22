@@ -19,7 +19,7 @@
 			"SecurityPolicy": 1,
     			"DisplayFieldName": "Text",
 			"Fields": [
-			],
+			]
 		},
 		{
 			"type": "request",
