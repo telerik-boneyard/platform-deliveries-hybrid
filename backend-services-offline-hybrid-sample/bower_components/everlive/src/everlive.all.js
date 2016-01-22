@@ -2128,10 +2128,11 @@ module.exports = function (value, replacer, space) {
 
 
 },{}],12:[function(require,module,exports){
-// Mingo.js 0.4.0
+// Mingo.js 0.6.2
 // Copyright (c) 2015 Francis Asante <kofrasa@gmail.com>
 // MIT
 
+;
 (function (root, undefined) {
 
   "use strict";
@@ -2139,6 +2140,8 @@ module.exports = function (value, replacer, space) {
   // global on the server, window in the browser
   var Mingo = {}, previousMingo;
   var _;
+
+  Mingo.VERSION = '0.6.2';
 
   // backup previous Mingo
   if (root != null) {
@@ -2159,10 +2162,8 @@ module.exports = function (value, replacer, space) {
 
   // Export the Mingo object for Node.js
   if (nodeEnabled || nativeScriptEnabled || browserifyEnabled) {
-    if (typeof module !== 'undefined' && module.exports) {
-      exports = module.exports = Mingo;
-    } else {
-      exports = Mingo;
+    if (typeof module !== 'undefined') {
+      module.exports = Mingo;
     }
     _ = require("underscore"); // get a reference to underscore
   } else {
@@ -2175,21 +2176,31 @@ module.exports = function (value, replacer, space) {
     _.isString, _.isBoolean, _.isNumber, _.isDate, _.isNull, _.isRegExp
   ];
 
-  function normalize(expr) {
-    // normalized primitives
+  function isPrimitive(value) {
     for (var i = 0; i < primitives.length; i++) {
-      if (primitives[i](expr)) {
-        if (_.isRegExp(expr)) {
-          return {"$regex": expr};
-        } else {
-          return {"$eq": expr};
-        }
+      if (primitives[i](value)) {
+        return true;
       }
     }
+    return false;
+  }
+
+  /**
+   * Simplify expression for easy evaluation with query operators map
+   * @param expr
+   * @returns {*}
+   */
+  function normalize(expr) {
+
+    // normalized primitives
+    if (isPrimitive(expr)) {
+      return _.isRegExp(expr) ? {"$regex": expr} : {"$eq": expr};
+    }
+
     // normalize object expression
     if (_.isObject(expr)) {
       var keys = _.keys(expr);
-      var notQuery = _.intersection(Ops.queryOperators, keys).length === 0;
+      var notQuery = _.intersection(ops(OP_QUERY), keys).length === 0;
 
       // no valid query operator found, so we do simple comparison
       if (notQuery) {
@@ -2274,21 +2285,11 @@ module.exports = function (value, replacer, space) {
     },
 
     _processOperator: function (field, operator, value) {
-      var compiledSelector;
-      if (_.contains(Ops.simpleOperators, operator)) {
-        compiledSelector = {
-          test: function (obj) {
-            var actualValue = resolve(obj, field);
-            // value of operator must already be fully resolved.
-            return simpleOperators[operator](actualValue, value);
-          }
-        };
-      } else if (_.contains(Ops.compoundOperators, operator)) {
-        compiledSelector = compoundOperators[operator](field, value);
+      if (_.contains(ops(OP_QUERY), operator)) {
+        this._compiled.push(queryOperators[operator](field, value));
       } else {
         throw new Error("Invalid query operator '" + operator + "' detected");
       }
-      this._compiled.push(compiledSelector);
     },
 
     /**
@@ -2574,14 +2575,16 @@ module.exports = function (value, replacer, space) {
         // run aggregation pipeline
         for (var i = 0; i < this._operators.length; i++) {
           var operator = this._operators[i];
-          for (var key in operator) {
-            if (operator.hasOwnProperty(key)) {
-              if (query instanceof Mingo.Query) {
-                collection = pipelineOperators[key].call(query, collection, operator[key]);
-              } else {
-                collection = pipelineOperators[key](collection, operator[key]);
-              }
+          var key = _.keys(operator);
+          if (key.length == 1 && _.contains(ops(OP_PIPELINE), key[0])) {
+            key = key[0];
+            if (query instanceof Mingo.Query) {
+              collection = pipelineOperators[key].call(query, collection, operator[key]);
+            } else {
+              collection = pipelineOperators[key](collection, operator[key]);
             }
+          } else {
+            throw new Error("Invalid aggregation operator '" + key + "'");
           }
         }
       }
@@ -2620,9 +2623,7 @@ module.exports = function (value, replacer, space) {
       if (isText && _.isArray(value)) {
         var res = [];
         _.each(value, function (item) {
-          if (_.isObject(item)) {
-            res.push(resolve(item, names[i]));
-          }
+          res.push(resolve(item, names[i]));
         });
         value = res;
       } else {
@@ -2666,9 +2667,92 @@ module.exports = function (value, replacer, space) {
    */
   Mingo.aggregate = function (collection, pipeline) {
     if (!_.isArray(pipeline)) {
-      throw new Error("Aggregation pipeline must be an array")
+      throw new Error("Aggregation pipeline must be an array");
     }
     return (new Mingo.Aggregator(pipeline)).run(collection);
+  };
+
+  /**
+   * Add new operators
+   * @param type the operator type to extend
+   * @param f a function returning an object of new operators
+   */
+  Mingo.addOperators = function (type, f) {
+    var newOperators = f({
+      resolve: resolve,
+      computeValue: computeValue,
+      ops: ops,
+      key: function () {
+        return settings.key;
+      }
+    });
+
+    // ensure correct type specified
+    if (!_.contains([OP_AGGREGATE, OP_GROUP, OP_PIPELINE, OP_PROJECTION, OP_QUERY], type)) {
+      throw new Error("Could not identify type '" + type + "'");
+    }
+
+    var operators = ops(type);
+
+    // check for existing operators
+    _.each(_.keys(newOperators), function (op) {
+      if (!/^\$\w+$/.test(op)) {
+        throw new Error("Invalid operator name '" + op + "'");
+      }
+      if (_.contains(operators, op)) {
+        throw new Error("Operator " + op + " is already defined for " + type + " operators");
+      }
+    });
+
+    var wrapped = {};
+
+    switch (type) {
+      case OP_QUERY:
+        _.each(_.keys(newOperators), function (op) {
+          wrapped[op] = (function (f, ctx) {
+            return function (selector, value) {
+              return {
+                test: function (obj) {
+                  // value of field must be fully resolved.
+                  var lhs = resolve(obj, selector);
+                  var result = f.call(ctx, selector, lhs, value);
+                  if (_.isBoolean(result)) {
+                    return result;
+                  } else if (result instanceof Mingo.Query) {
+                    return result.test(obj);
+                  } else {
+                    throw new Error("Invalid return type for '" + op + "'. Must return a Boolean or Mingo.Query");
+                  }
+                }
+              };
+            }
+          }(newOperators[op], newOperators));
+        });
+        break;
+      case OP_PROJECTION:
+        _.each(_.keys(newOperators), function (op) {
+          wrapped[op] = (function (f, ctx) {
+            return function (obj, expr, selector) {
+              var lhs = resolve(obj, selector);
+              return f.call(ctx, selector, lhs, expr);
+            }
+          }(newOperators[op], newOperators));
+        });
+        break;
+      default:
+        _.each(_.keys(newOperators), function (op) {
+          wrapped[op] = (function (f, ctx) {
+            return function () {
+              var args = Array.prototype.slice.call(arguments);
+              return f.apply(ctx, args);
+            }
+          }(newOperators[op], newOperators));
+        });
+    }
+
+    // toss the operator salad :)
+    _.extend(OPERATORS[type], wrapped);
+
   };
 
   /**
@@ -2708,28 +2792,28 @@ module.exports = function (value, replacer, space) {
     $group: function (collection, expr) {
       // lookup key for grouping
       var idKey = expr[settings.key];
-      var indexes = [];
-      // group collection by key
-      var groups = _.groupBy(collection, function (obj) {
-        var key = computeValue(obj, idKey, idKey);
-        indexes.push(key);
-        return key;
+
+      var partitions = groupBy(collection, function (obj) {
+        return computeValue(obj, idKey, idKey);
       });
 
-      // group indexes
-      indexes = _.uniq(indexes);
+      var result = [];
 
       // remove the group key
       expr = _.omit(expr, settings.key);
 
-      var result = [];
-      _.each(indexes, function (index) {
+      _.each(partitions.keys, function (value, i) {
         var obj = {};
-        obj[settings.key] = index;
+
+        // exclude undefined key value
+        if (!_.isUndefined(value)) {
+          obj[settings.key] = value;
+        }
+
         // compute remaining keys in expression
         for (var key in expr) {
           if (expr.hasOwnProperty(key)) {
-            obj[key] = accumulate(groups[index], key, expr[key]);
+            obj[key] = accumulate(partitions.groups[i], key, expr[key]);
           }
         }
         result.push(obj);
@@ -2792,6 +2876,7 @@ module.exports = function (value, replacer, space) {
       }
 
       for (var i = 0; i < collection.length; i++) {
+
         var obj = collection[i];
         var cloneObj = {};
         var foundSlice = false;
@@ -2800,6 +2885,7 @@ module.exports = function (value, replacer, space) {
         if (idOnlyExcludedExpression) {
           dropKeys.push(settings.key);
         }
+
         _.each(objKeys, function (key) {
 
           var subExpr = expr[key];
@@ -2818,7 +2904,7 @@ module.exports = function (value, replacer, space) {
           } else if (_.isObject(subExpr)) {
             var operator = _.keys(subExpr);
             operator = operator.length > 1 ? false : operator[0];
-            if (operator !== false && _.contains(Ops.projectionOperators, operator)) {
+            if (operator !== false && _.contains(ops(OP_PROJECTION), operator)) {
               // apply the projection operator on the operator expression for the key
               var temp = projectionOperators[operator](obj, subExpr[operator], key);
               if (!_.isUndefined(temp)) {
@@ -2835,8 +2921,8 @@ module.exports = function (value, replacer, space) {
             dropKeys.push(key);
           }
 
-          if (newValue !== undefined) {
-            cloneObj[key] = _.isObject(newValue) ? _.clone(newValue) : newValue;
+          if (!_.isUndefined(newValue)) {
+            cloneObj[key] = newValue;
           }
         });
         // if projection included $slice operator
@@ -2932,6 +3018,9 @@ module.exports = function (value, replacer, space) {
       return collection;
     }
   };
+
+  ////////// QUERY OPERATORS //////////
+  var queryOperators = {};
 
   var compoundOperators = {
 
@@ -3048,6 +3137,9 @@ module.exports = function (value, replacer, space) {
 
   };
 
+  // add compound query operators
+  _.extend(queryOperators, compoundOperators);
+
   var simpleOperators = {
 
     /**
@@ -3058,7 +3150,8 @@ module.exports = function (value, replacer, space) {
      * @returns {*}
      */
     $eq: function (a, b) {
-      a = _.isArray(a) ? a : [a];
+      // flatten to reach nested values. fix for https://github.com/kofrasa/mingo/issues/19
+      a = _.flatten(_.isArray(a) ? a : [a]);
       a = _.find(a, function (val) {
         return _.isEqual(val, b);
       });
@@ -3286,8 +3379,21 @@ module.exports = function (value, replacer, space) {
           return false;
       }
     }
-
   };
+  // add simple query operators
+  _.each(_.keys(simpleOperators), function (op) {
+    queryOperators[op] = (function (f, ctx) {
+      return function (selector, value) {
+        return {
+          test: function (obj) {
+            // value of field must be fully resolved.
+            var lhs = resolve(obj, selector);
+            return f.call(ctx, lhs, value);
+          }
+        };
+      }
+    }(simpleOperators[op], simpleOperators));
+  });
 
   var projectionOperators = {
 
@@ -3368,7 +3474,7 @@ module.exports = function (value, replacer, space) {
      */
     $addToSet: function (collection, expr) {
       var result = _.map(collection, function (obj) {
-        return computeValue(obj, expr);
+        return computeValue(obj, expr, null);
       });
       return _.uniq(result);
     },
@@ -3381,13 +3487,16 @@ module.exports = function (value, replacer, space) {
      * @returns {*}
      */
     $sum: function (collection, expr) {
+      if (!_.isArray(collection)) {
+        return 0;
+      }
       if (_.isNumber(expr)) {
         // take a short cut if expr is number literal
         return collection.length * expr;
       }
       return _.reduce(collection, function (acc, obj) {
         // pass empty field to avoid naming conflicts with fields on documents
-        return acc + computeValue(obj, expr);
+        return acc + computeValue(obj, expr, null);
       }, 0);
     },
 
@@ -3400,9 +3509,9 @@ module.exports = function (value, replacer, space) {
      */
     $max: function (collection, expr) {
       var obj = _.max(collection, function (obj) {
-        return computeValue(obj, expr);
+        return computeValue(obj, expr, null);
       });
-      return computeValue(obj, expr);
+      return computeValue(obj, expr, null);
     },
 
     /**
@@ -3414,9 +3523,9 @@ module.exports = function (value, replacer, space) {
      */
     $min: function (collection, expr) {
       var obj = _.min(collection, function (obj) {
-        return computeValue(obj, expr);
+        return computeValue(obj, expr, null);
       });
-      return computeValue(obj, expr);
+      return computeValue(obj, expr, null);
     },
 
     /**
@@ -3439,7 +3548,7 @@ module.exports = function (value, replacer, space) {
      */
     $push: function (collection, expr) {
       return _.map(collection, function (obj) {
-        return computeValue(obj, expr);
+        return computeValue(obj, expr, null);
       });
     },
 
@@ -3467,7 +3576,7 @@ module.exports = function (value, replacer, space) {
   };
 
 
-  /////////// Common Aggregation Operators ///////////
+  /////////// Aggregation Operators ///////////
 
   var arithmeticOperators = {
 
@@ -3479,7 +3588,7 @@ module.exports = function (value, replacer, space) {
      * @returns {Object}
      */
     $add: function (obj, expr) {
-      var args = computeValue(obj, expr);
+      var args = computeValue(obj, expr, null);
       return _.reduce(args, function (memo, num) {
         return memo + num;
       }, 0);
@@ -3493,7 +3602,7 @@ module.exports = function (value, replacer, space) {
      * @returns {number}
      */
     $subtract: function (obj, expr) {
-      var args = computeValue(obj, expr);
+      var args = computeValue(obj, expr, null);
       return args[0] - args[1];
     },
 
@@ -3505,7 +3614,7 @@ module.exports = function (value, replacer, space) {
      * @returns {number}
      */
     $divide: function (obj, expr) {
-      var args = computeValue(obj, expr);
+      var args = computeValue(obj, expr, null);
       return args[0] / args[1];
     },
 
@@ -3517,7 +3626,7 @@ module.exports = function (value, replacer, space) {
      * @returns {Object}
      */
     $multiply: function (obj, expr) {
-      var args = computeValue(obj, expr);
+      var args = computeValue(obj, expr, null);
       return _.reduce(args, function (memo, num) {
         return memo * num;
       }, 1);
@@ -3531,7 +3640,7 @@ module.exports = function (value, replacer, space) {
      * @returns {number}
      */
     $mod: function (obj, expr) {
-      var args = computeValue(obj, expr);
+      var args = computeValue(obj, expr, null);
       return args[0] % args[1];
     }
   };
@@ -3546,7 +3655,7 @@ module.exports = function (value, replacer, space) {
      * @returns {string|*}
      */
     $concat: function (obj, expr) {
-      var args = computeValue(obj, expr);
+      var args = computeValue(obj, expr, null);
       // does not allow concatenation with nulls
       if (_.contains(args, null) || _.contains(args, undefined)) {
         return null;
@@ -3562,7 +3671,7 @@ module.exports = function (value, replacer, space) {
      * @returns {number}
      */
     $strcasecmp: function (obj, expr) {
-      var args = computeValue(obj, expr);
+      var args = computeValue(obj, expr, null);
       args[0] = _.isEmpty(args[0]) ? "" : args[0].toUpperCase();
       args[1] = _.isEmpty(args[1]) ? "" : args[1].toUpperCase();
       if (args[0] > args[1]) {
@@ -3580,7 +3689,7 @@ module.exports = function (value, replacer, space) {
      * @returns {string}
      */
     $substr: function (obj, expr) {
-      var args = computeValue(obj, expr);
+      var args = computeValue(obj, expr, null);
       if (_.isString(args[0])) {
         if (args[1] < 0) {
           return "";
@@ -3601,7 +3710,7 @@ module.exports = function (value, replacer, space) {
      * @returns {string}
      */
     $toLower: function (obj, expr) {
-      var value = computeValue(obj, expr);
+      var value = computeValue(obj, expr, null);
       return _.isEmpty(value) ? "" : value.toLowerCase();
     },
 
@@ -3613,7 +3722,7 @@ module.exports = function (value, replacer, space) {
      * @returns {string}
      */
     $toUpper: function (obj, expr) {
-      var value = computeValue(obj, expr);
+      var value = computeValue(obj, expr, null);
       return _.isEmpty(value) ? "" : value.toUpperCase();
     }
   };
@@ -3625,8 +3734,8 @@ module.exports = function (value, replacer, space) {
      * @param expr
      */
     $dayOfYear: function (obj, expr) {
-      var d = computeValue(obj, expr);
-      if (_.isDate(value)) {
+      var d = computeValue(obj, expr, null);
+      if (_.isDate(d)) {
         var start = new Date(d.getFullYear(), 0, 0);
         var diff = d - start;
         var oneDay = 1000 * 60 * 60 * 24;
@@ -3641,7 +3750,7 @@ module.exports = function (value, replacer, space) {
      * @param expr
      */
     $dayOfMonth: function (obj, expr) {
-      var d = computeValue(obj, expr);
+      var d = computeValue(obj, expr, null);
       return _.isDate(d) ? d.getDate() : undefined;
     },
 
@@ -3651,7 +3760,7 @@ module.exports = function (value, replacer, space) {
      * @param expr
      */
     $dayOfWeek: function (obj, expr) {
-      var d = computeValue(obj, expr);
+      var d = computeValue(obj, expr, null);
       return _.isDate(d) ? d.getDay() + 1 : undefined;
     },
 
@@ -3661,8 +3770,8 @@ module.exports = function (value, replacer, space) {
      * @param expr
      */
     $year: function (obj, expr) {
-      var d = computeValue(obj, expr);
-      return _.isDate(d) ? d.getFullYear() + 1 : undefined;
+      var d = computeValue(obj, expr, null);
+      return _.isDate(d) ? d.getFullYear() : undefined;
     },
 
     /**
@@ -3671,7 +3780,7 @@ module.exports = function (value, replacer, space) {
      * @param expr
      */
     $month: function (obj, expr) {
-      var d = computeValue(obj, expr);
+      var d = computeValue(obj, expr, null);
       return _.isDate(d) ? d.getMonth() + 1 : undefined;
     },
 
@@ -3682,9 +3791,19 @@ module.exports = function (value, replacer, space) {
      * @param expr
      */
     $week: function (obj, expr) {
-      var d = computeValue(obj, expr);
-      // TODO
-      throw new Error("Not Implemented");
+      // source: http://stackoverflow.com/a/6117889/1370481
+      var d = computeValue(obj, expr, null);
+
+      // Copy date so don't modify original
+      d = new Date(+d);
+      d.setHours(0, 0, 0);
+      // Set to nearest Thursday: current date + 4 - current day number
+      // Make Sunday's day number 7
+      d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+      // Get first day of year
+      var yearStart = new Date(d.getFullYear(), 0, 1);
+      // Calculate full weeks to nearest Thursday
+      return Math.floor(( ( (d - yearStart) / 8.64e7) + 1) / 7);
     },
 
     /**
@@ -3693,7 +3812,7 @@ module.exports = function (value, replacer, space) {
      * @param expr
      */
     $hour: function (obj, expr) {
-      var d = computeValue(obj, expr);
+      var d = computeValue(obj, expr, null);
       return _.isDate(d) ? d.getHours() : undefined;
     },
 
@@ -3703,7 +3822,7 @@ module.exports = function (value, replacer, space) {
      * @param expr
      */
     $minute: function (obj, expr) {
-      var d = computeValue(obj, expr);
+      var d = computeValue(obj, expr, null);
       return _.isDate(d) ? d.getMinutes() : undefined;
     },
 
@@ -3713,7 +3832,7 @@ module.exports = function (value, replacer, space) {
      * @param expr
      */
     $second: function (obj, expr) {
-      var d = computeValue(obj, expr);
+      var d = computeValue(obj, expr, null);
       return _.isDate(d) ? d.getSeconds() : undefined;
     },
 
@@ -3723,33 +3842,49 @@ module.exports = function (value, replacer, space) {
      * @param expr
      */
     $millisecond: function (obj, expr) {
-      var d = computeValue(obj, expr);
+      var d = computeValue(obj, expr, null);
       return _.isDate(d) ? d.getMilliseconds() : undefined;
     },
 
     /**
      * Returns the date as a formatted string.
-     * @param obj
-     * @param expr
+     *
+     * %Y  Year (4 digits, zero padded)  0000-9999
+     * %m  Month (2 digits, zero padded)  01-12
+     * %d  Day of Month (2 digits, zero padded)  01-31
+     * %H  Hour (2 digits, zero padded, 24-hour clock)  00-23
+     * %M  Minute (2 digits, zero padded)  00-59
+     * %S  Second (2 digits, zero padded)  00-60
+     * %L  Millisecond (3 digits, zero padded)  000-999
+     * %j  Day of year (3 digits, zero padded)  001-366
+     * %w  Day of week (1-Sunday, 7-Saturday)  1-7
+     * %U  Week of year (2 digits, zero padded)  00-53
+     * %%  Percent Character as a Literal  %
+     *
+     * @param obj current object
+     * @param expr operator expression
      */
     $dateToString: function (obj, expr) {
+
       var fmt = expr['format'];
-      var date = computeValue(obj, expr['date']);
-      // TODO: use python-style date formatting
-      /*
-       %Y	Year (4 digits, zero padded)	0000-9999
-       %m	Month (2 digits, zero padded)	01-12
-       %d	Day of Month (2 digits, zero padded)	01-31
-       %H	Hour (2 digits, zero padded, 24-hour clock)	00-23
-       %M	Minute (2 digits, zero padded)	00-59
-       %S	Second (2 digits, zero padded)	00-60
-       %L	Millisecond (3 digits, zero padded)	000-999
-       %j	Day of year (3 digits, zero padded)	001-366
-       %w	Day of week (1-Sunday, 7-Saturday)	1-7
-       %U	Week of year (2 digits, zero padded)	00-53
-       %%	Percent Character as a Literal	%
-       */
-      throw new Error("Not Implemented");
+      var date = computeValue(obj, expr['date'], null);
+      var matches = fmt.match(/(%%|%Y|%m|%d|%H|%M|%S|%L|%j|%w|%U)/g);
+
+      for (var i = 0, len = matches.length; i < len; i++) {
+        var hdlr = DATE_SYM_TABLE[matches[i]];
+        var value = hdlr;
+
+        if (_.isArray(hdlr)) {
+          // reuse date operators
+          var fn = this[hdlr[0]];
+          var pad = hdlr[1];
+          value = padDigits(fn.call(this, obj, date), pad);
+        }
+        // replace the match with resolved value
+        fmt = fmt.replace(matches[i], value);
+      }
+
+      return fmt;
     }
   };
 
@@ -3760,7 +3895,7 @@ module.exports = function (value, replacer, space) {
      * @param expr
      */
     $setEquals: function (obj, expr) {
-      var args = computeValue(obj, expr);
+      var args = computeValue(obj, expr, null);
       var first = _.uniq(args[0]);
       var second = _.uniq(args[1]);
       if (first.length !== second.length) {
@@ -3775,7 +3910,7 @@ module.exports = function (value, replacer, space) {
      * @param expr
      */
     $setIntersection: function (obj, expr) {
-      var args = computeValue(obj, expr);
+      var args = computeValue(obj, expr, null);
       return _.intersection(args[0], args[1]);
     },
 
@@ -3785,7 +3920,7 @@ module.exports = function (value, replacer, space) {
      * @param expr
      */
     $setDifference: function (obj, expr) {
-      var args = computeValue(obj, expr);
+      var args = computeValue(obj, expr, null);
       return _.difference(args[0], args[1]);
     },
 
@@ -3795,7 +3930,7 @@ module.exports = function (value, replacer, space) {
      * @param expr
      */
     $setUnion: function (obj, expr) {
-      var args = computeValue(obj, expr);
+      var args = computeValue(obj, expr, null);
       return _.union(args[0], args[1]);
     },
 
@@ -3805,7 +3940,7 @@ module.exports = function (value, replacer, space) {
      * @param expr
      */
     $setIsSubset: function (obj, expr) {
-      var args = computeValue(obj, expr);
+      var args = computeValue(obj, expr, null);
       return _.intersection(args[0], args[1]).length === args[0].length;
     },
 
@@ -3816,7 +3951,7 @@ module.exports = function (value, replacer, space) {
      */
     $anyElementTrue: function (obj, expr) {
       // mongodb nests the array expression in another
-      var args = computeValue(obj, expr)[0];
+      var args = computeValue(obj, expr, null)[0];
       for (var i = 0; i < args.length; i++) {
         if (!!args[i])
           return true;
@@ -3831,7 +3966,7 @@ module.exports = function (value, replacer, space) {
      */
     $allElementsTrue: function (obj, expr) {
       // mongodb nests the array expression in another
-      var args = computeValue(obj, expr)[0];
+      var args = computeValue(obj, expr, null)[0];
       for (var i = 0; i < args.length; i++) {
         if (!args[i])
           return false;
@@ -3863,8 +3998,8 @@ module.exports = function (value, replacer, space) {
         thenExpr = expr['then'];
         elseExpr = expr['else'];
       }
-      var condition = computeValue(obj, ifExpr);
-      return condition ? computeValue(obj, thenExpr) : computeValue(obj, elseExpr);
+      var condition = computeValue(obj, ifExpr, null);
+      return condition ? computeValue(obj, thenExpr, null) : computeValue(obj, elseExpr, null);
     },
 
     /**
@@ -3879,7 +4014,7 @@ module.exports = function (value, replacer, space) {
       if (!_.isArray(expr) || expr.length != 2) {
         throw new Error("Invalid arguments for $ifNull operator");
       }
-      var args = computeValue(obj, expr);
+      var args = computeValue(obj, expr, null);
       return (args[0] === null || args[0] === undefined) ? args[1] : args[0];
     }
   };
@@ -3893,42 +4028,253 @@ module.exports = function (value, replacer, space) {
      * @returns {number}
      */
     $cmp: function (obj, expr) {
-      var args = computeValue(obj, expr);
+      var args = computeValue(obj, expr, null);
       if (args[0] > args[1]) {
         return 1;
       }
       return (args[0] < args[1]) ? -1 : 0;
     }
   };
-
-  // combine aggregate operators
-  var aggregateOperators = _.extend(
-      {},
-      arithmeticOperators,
-      comparisonOperators,
-      conditionalOperators,
-      dateOperators,
-      setOperators,
-      stringOperators
-  );
-
   // mixin comparison operators
   _.each(["$eq", "$ne", "$gt", "$gte", "$lt", "$lte"], function (op) {
-    aggregateOperators[op] = function (obj, expr) {
-      var args = computeValue(obj, expr);
+    comparisonOperators[op] = function (obj, expr) {
+      var args = computeValue(obj, expr, null);
       return simpleOperators[op](args[0], args[1]);
     };
   });
 
-  var Ops = {
-    simpleOperators: _.keys(simpleOperators),
-    compoundOperators: _.keys(compoundOperators),
-    aggregateOperators: _.keys(aggregateOperators),
-    groupOperators: _.keys(groupOperators),
-    pipelineOperators: _.keys(pipelineOperators),
-    projectionOperators: _.keys(projectionOperators)
+  var arrayOperators = {
+    /**
+     * Counts and returns the total the number of items in an array.
+     * @param obj
+     * @param expr
+     */
+    $size: function (obj, expr) {
+      var value = computeValue(obj, expr, null);
+      return _.isArray(value) ? value.length : undefined;
+    }
   };
-  Ops.queryOperators = _.union(Ops.simpleOperators, Ops.compoundOperators);
+
+  var literalOperators = {
+    /**
+     * Return a value without parsing.
+     * @param obj
+     * @param expr
+     */
+    $literal: function (obj, expr) {
+      return expr;
+    }
+  };
+
+
+  var variableOperators = {
+    /**
+     * Applies a subexpression to each element of an array and returns the array of resulting values in order.
+     * @param obj
+     * @param expr
+     * @returns {Array|*}
+     */
+    $map: function (obj, expr) {
+      var inputExpr = computeValue(obj, expr["input"], null);
+      if (!_.isArray(inputExpr)) {
+        throw new Error("Input expression for $map must resolve to an array");
+      }
+      var asExpr = expr["as"];
+      var inExpr = expr["in"];
+
+      // HACK: add the "as" expression as a value on the object to take advantage of "resolve()"
+      // which will reduce to that value when invoked. The reference to the as expression will be prefixed with "$$".
+      // But since a "$" is stripped of before passing the name to "resolve()" we just need to prepend "$" to the key.
+      var tempKey = "$" + asExpr;
+      // let's save any value that existed, kinda useless but YOU CAN NEVER BE TOO SURE, CAN YOU :)
+      var original = obj[tempKey];
+      return _.map(inputExpr, function (item) {
+        obj[tempKey] = item;
+        var value = computeValue(obj, inExpr, null);
+        // cleanup and restore
+        if (_.isUndefined(original)) {
+          delete obj[tempKey];
+        } else {
+          obj[tempKey] = original;
+        }
+        return value;
+      });
+
+    },
+
+    /**
+     * Defines variables for use within the scope of a subexpression and returns the result of the subexpression.
+     * @param obj
+     * @param expr
+     * @returns {*}
+     */
+    $let: function (obj, expr) {
+      var varsExpr = expr["vars"];
+      var inExpr = expr["in"];
+
+      // resolve vars
+      var originals = {};
+      var varsKeys = _.keys(varsExpr);
+      _.each(varsKeys, function (key) {
+        var val = computeValue(obj, varsExpr[key], null);
+        var tempKey = "$" + key;
+        // set value on object using same technique as in "$map"
+        originals[tempKey] = obj[tempKey];
+        obj[tempKey] = val;
+      });
+
+      var value = computeValue(obj, inExpr, null);
+
+      // cleanup and restore
+      _.each(varsKeys, function (key) {
+        var tempKey = "$" + key;
+        if (_.isUndefined(originals[tempKey])) {
+          delete obj[tempKey];
+        } else {
+          obj[tempKey] = originals[tempKey];
+        }
+      });
+
+      return value;
+    }
+  };
+
+  var booleanOperators = {
+    /**
+     * Returns true only when all its expressions evaluate to true. Accepts any number of argument expressions.
+     * @param obj
+     * @param expr
+     * @returns {boolean}
+     */
+    $and: function (obj, expr) {
+      var value = computeValue(obj, expr, null);
+      return _.every(value);
+    },
+
+    /**
+     * Returns true when any of its expressions evaluates to true. Accepts any number of argument expressions.
+     * @param obj
+     * @param expr
+     * @returns {boolean}
+     */
+    $or: function (obj, expr) {
+      var value = computeValue(obj, expr, null);
+      return _.some(value);
+    },
+
+    /**
+     * Returns the boolean value that is the opposite of its argument expression. Accepts a single argument expression.
+     * @param obj
+     * @param expr
+     * @returns {boolean}
+     */
+    $not: function (obj, expr) {
+      return !computeValue(obj, expr[0], null);
+    }
+  };
+
+  // combine aggregate operators
+  var aggregateOperators = _.extend(
+    {},
+    arrayOperators,
+    arithmeticOperators,
+    booleanOperators,
+    comparisonOperators,
+    conditionalOperators,
+    dateOperators,
+    literalOperators,
+    setOperators,
+    stringOperators,
+    variableOperators
+  );
+
+  var OP_QUERY = Mingo.OP_QUERY = 'query',
+    OP_GROUP = Mingo.OP_GROUP = 'group',
+    OP_AGGREGATE = Mingo.OP_AGGREGATE = 'aggregate',
+    OP_PIPELINE = Mingo.OP_PIPELINE = 'pipeline',
+    OP_PROJECTION = Mingo.OP_PROJECTION = 'projection';
+
+  // operator definitions
+  var OPERATORS = {
+    'aggregate': aggregateOperators,
+    'group': groupOperators,
+    'pipeline': pipelineOperators,
+    'projection': projectionOperators,
+    'query': queryOperators
+  };
+
+  // used for formatting dates in $dateToString operator
+  var DATE_SYM_TABLE = {
+    '%Y': ['$year', 4],
+    '%m': ['$month', 2],
+    '%d': ['$dayOfMonth', 2],
+    '%H': ['$hour', 2],
+    '%M': ['$minute', 2],
+    '%S': ['$second', 2],
+    '%L': ['$millisecond', 3],
+    '%j': ['$dayOfYear', 3],
+    '%w': ['$dayOfWeek', 1],
+    '%U': ['$week', 2],
+    '%%': '%'
+  };
+
+  function padDigits(number, digits) {
+    return new Array(Math.max(digits - String(number).length + 1, 0)).join('0') + number;
+  }
+
+  /**
+   * Return the registered operators on the given operator category
+   * @param type catgory of operators
+   * @returns {*}
+   */
+  function ops(type) {
+    return _.keys(OPERATORS[type]);
+  }
+
+  /**
+   * Groups the collection into sets by the returned key
+   *
+   * @param collection
+   * @param fn
+   */
+  function groupBy(collection, fn) {
+
+    var result = {
+      'keys': [],
+      'groups': []
+    };
+
+    _.each(collection, function (obj) {
+
+      var key = fn(obj);
+      var index = -1;
+
+      if (_.isObject(key)) {
+        for (var i = 0; i < result.keys.length; i++) {
+          if (_.isEqual(key, result.keys[i])) {
+            index = i;
+            break;
+          }
+        }
+      } else {
+        index = _.indexOf(result.keys, key);
+      }
+
+      if (index > -1) {
+        result.groups[index].push(obj);
+      } else {
+        result.keys.push(key);
+        result.groups.push([obj]);
+      }
+    });
+
+    // assert this
+    if (result.keys.length !== result.groups.length) {
+      throw new Error("assert groupBy(): keys.length !== groups.length");
+    }
+
+    return result;
+  }
 
   /**
    * Returns the result of evaluating a $group operation over a collection
@@ -3939,7 +4285,7 @@ module.exports = function (value, replacer, space) {
    * @returns {*}
    */
   function accumulate(collection, field, expr) {
-    if (_.contains(Ops.groupOperators, field)) {
+    if (_.contains(ops(OP_GROUP), field)) {
       return groupOperators[field](collection, expr);
     }
 
@@ -3950,7 +4296,7 @@ module.exports = function (value, replacer, space) {
           result[key] = accumulate(collection, key, expr[key]);
           // must run ONLY one group operator per expression
           // if so, return result of the computed value
-          if (_.contains(Ops.groupOperators, key)) {
+          if (_.contains(ops(OP_GROUP), key)) {
             result = result[key];
             // if there are more keys in expression this is bad
             if (_.keys(expr).length > 1) {
@@ -3977,7 +4323,7 @@ module.exports = function (value, replacer, space) {
   function computeValue(obj, expr, field) {
 
     // if the field of the object is a valid operator
-    if (_.contains(Ops.aggregateOperators, field)) {
+    if (_.contains(ops(OP_AGGREGATE), field)) {
       return aggregateOperators[field](obj, expr);
     }
 
@@ -3989,11 +4335,13 @@ module.exports = function (value, replacer, space) {
 
     var result;
 
-    if (_.isArray(expr)) {
-      result = [];
-      for (var i = 0; i < expr.length; i++) {
-        result.push(computeValue(obj, expr[i], null));
-      }
+    // check and return value if already in a resolved state
+    if (isPrimitive(expr)) {
+      return expr;
+    } else if (_.isArray(expr)) {
+      result = _.map(expr, function (item) {
+        return computeValue(obj, item, null);
+      });
     } else if (_.isObject(expr)) {
       result = {};
       for (var key in expr) {
@@ -4002,7 +4350,7 @@ module.exports = function (value, replacer, space) {
 
           // must run ONLY one aggregate operator per expression
           // if so, return result of the computed value
-          if (_.contains(Ops.aggregateOperators, key)) {
+          if (_.contains(ops(OP_AGGREGATE), key)) {
             result = result[key];
             // if there are more keys in expression this is bad
             if (_.keys(expr).length > 1) {
@@ -4010,13 +4358,6 @@ module.exports = function (value, replacer, space) {
             }
             break;
           }
-        }
-      }
-    } else {
-      // check and return value if already in a resolved state
-      for (var i = 0; i < primitives.length; i++) {
-        if (primitives[i](expr)) {
-          return expr;
         }
       }
     }
@@ -11990,6 +12331,127 @@ code.google.com/p/crypto-js/wiki/License
 
 },{}],36:[function(require,module,exports){
 'use strict';
+
+var AggregationTranslator = {};
+
+function getFieldAggregation(aggregationDefinition) {
+    var result;
+
+    if (aggregationDefinition.hasOwnProperty('count')) {
+        result = {'$sum': 1};
+    } else if (aggregationDefinition.min) {
+        result = {'$min': '$' + aggregationDefinition.min};
+    } else if (aggregationDefinition.max) {
+        result = {'$max': '$' + aggregationDefinition.max};
+    } else if (aggregationDefinition.avg) {
+        result = {'$avg': '$' + aggregationDefinition.avg};
+    } else if (aggregationDefinition.sum) {
+        result = {'$sum': '$' + aggregationDefinition.sum};
+    } else {
+        throw new Error('The aggregating function was not recognized or is not supported: ' + JSON.stringify(aggregationDefinition));
+    }
+
+    return result;
+};
+
+function addGroupingField(fieldName, _idObject, $project) {
+    //Add the field in the _id object
+    _idObject[fieldName] = '$' + fieldName;
+
+    //Add projection so that the result contains the actual field e.g. is { fieldName: fieldValue } instead of { _id: { fieldName: fieldValue } }
+    $project[fieldName] = '$_id.' + fieldName;
+}
+
+
+/*
+ * aggregateDefinition = {
+ *		Filter: object|null,
+ *		GroupBy: string|array|null,
+ *		Aggregate: object|null
+ * }
+ */
+AggregationTranslator.translate = function (aggregateDefinition, options) {
+    var $match;     //$match clause for the pipeline
+    var $group;     //$group clause for the pipeline
+    var $project;   //$project clause for the pipeline
+
+    options = options || {};
+
+    //Process the filter
+    if (aggregateDefinition.Filter) {
+        $match = aggregateDefinition.Filter;
+    }
+
+    //Process the GroupBy clause
+    var _id;	//The required _id clause in the Mongo $group clause
+    var groupByDefinition = aggregateDefinition.GroupBy;
+    if (groupByDefinition) {
+        //Mongo returns all the values of the grouping fields in an _id field, but we use projection to put the values of grouping fields on first level, thus we do not want the _id
+        $project = {_id: 0};
+
+        _id = {};
+        if (Array.isArray(groupByDefinition)) {
+            //The GroupBy value is an array of fields to group by
+            var groupingFields = groupByDefinition;
+
+            //Process each grouping field
+            for (var i = 0; i < groupingFields.length; i++) {
+                var groupingField = groupingFields[i];
+                addGroupingField(groupingField, _id, $project);
+            }
+        } else {
+            //TODO: check if the value is string, and if not - throw error
+
+            //The GroupBy value is the name of the field to group by
+            var groupingField = groupByDefinition;
+
+            //Process the grouping field
+            addGroupingField(groupingField, _id, $project);
+        }
+    } else {
+        //No GroupBy clause, meaning we apply the aggregation to the whole resultset
+        _id = null;
+
+        //Adjust the $project definition so that the '_id' returned by Mongo is not included in the result.
+        $project = {_id: 0};
+    }
+    $group = {'_id': _id};
+
+    //Process the Aggregate clause
+    var aggregateDefinition = aggregateDefinition.Aggregate;
+    if (aggregateDefinition) {
+        for (var outputFieldName in aggregateDefinition) {
+            if (aggregateDefinition.hasOwnProperty(outputFieldName)) {
+                var fieldAggregation = aggregateDefinition[outputFieldName];
+
+                //Add the field aggregation to the Mongo $group clause
+                $group[outputFieldName] = getFieldAggregation(fieldAggregation);
+
+                //Add the field to the projection, so that it is included in the result
+                $project[outputFieldName] = 1;
+            }
+        }
+    }
+
+    //Construct the pipeline
+    var pipeline = [];
+
+    if ($match) pipeline.push({$match: $match});
+
+    if (options.maxDocumentsCount) {
+        pipeline.push({$limit: options.maxDocumentsCount});
+    }
+
+    if ($group) pipeline.push({$group: $group});
+
+    if ($project) pipeline.push({$project: $project});
+
+    return pipeline;
+};
+
+module.exports = AggregationTranslator;
+},{}],37:[function(require,module,exports){
+'use strict';
 var Constants = {};
 Constants.DefaultTakeItemsCount = 50;
 Constants.ExpandExpressionName = 'Expand';
@@ -12003,9 +12465,11 @@ Constants.TakeExpressionName = 'Take';
 Constants.ParentRelationFieldName = 'ParentRelationField';
 Constants.IdFieldNameClient = 'Id';
 Constants.TargetTypeNameFieldName = 'TargetTypeName';
+Constants.ReturnItemsCountFieldName = 'ReturnItemsCount';
+Constants.AggregateExpressionFieldName = 'Aggregate';
 
 module.exports = Constants;
-},{}],37:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 'use strict';
 var Constants = require('./Constants');
 
@@ -12016,16 +12480,16 @@ var Constants = require('./Constants');
  * if they can be combined for batch execution).
  * @constructor
  */
-var ExecutionNode = function (parent, relationNode) {
+var ExecutionNode = function (parentNode, relationNode) {
     var parentPath = '';
-    if (parent) {
-        parentPath = parent.path;
+    if (parentNode) {
+        parentPath = parentNode.path;
     }
     this.parent = parentPath;
     this.relations = [relationNode.path];
     this.name = relationNode.path;
     this.targetTypeName = relationNode.targetTypeName;
-    this.canAddOtherRelations = !relationNode.filterExpression && !relationNode.sortExpression && !relationNode.take && !relationNode.skip;
+    this.canAddOtherRelations = !relationNode.filterExpression && !relationNode.sortExpression && !relationNode.aggregateExpression && !relationNode.take && !relationNode.skip;
     this.children = [];
     var path = '';
     if (parentPath) {
@@ -12037,9 +12501,9 @@ var ExecutionNode = function (parent, relationNode) {
 
 /**
  * Inserts a RelationNode to an ExecutionNode.
- * @param relation - A Relation instance.
+ * @param relation - A RelationNode instance.
  */
-ExecutionNode.prototype.insertRelationNode = function (relation) {
+ExecutionNode.prototype._insertRelationNode = function (relation) {
     this.relations.push(relation.path);
 };
 
@@ -12047,7 +12511,7 @@ ExecutionNode.prototype.insertRelationNode = function (relation) {
  * Inserts a child node (which relations) depends from parent node result.
  * @param child - ExecutionNode instance representing child node.
  */
-ExecutionNode.prototype.insertChildrenNode = function (child) {
+ExecutionNode.prototype._insertChildNode = function (child) {
     this.children.push(child.name);
 };
 
@@ -12061,12 +12525,12 @@ ExecutionNode.prototype.canCombineWithRelation = function (relation) {
         return false;
     }
 
-    return this.targetTypeName === relation.targetTypeName && !relation.filterExpression && !relation.sortExpression && !relation.take && !relation.skip;
+    return this.targetTypeName === relation.targetTypeName && !relation.filterExpression && !relation.sortExpression && !relation.aggregateExpression && !relation.take && !relation.skip;
 };
 
 /** ExecutionTree
- * Class that allows the creation of an execution tree from a relationTree. Used to process all queries (master and child) in a correct order.
- * @param relationTree - An instance of relation tree.
+ * Class that allows the creation of an execution tree from a RelationTree object. Used to process all queries (master and child) in a correct order.
+ * @param relationTree - An instance of RelationTree.
  * @constructor
  */
 var ExecutionTree = function (relationTree) {
@@ -12098,28 +12562,51 @@ ExecutionTree.prototype.getExecutionNodeOfRelation = function (relation) {
     return null;
 };
 
+ExecutionTree.prototype.getRelationTree = function () {
+	return this._relationTree;
+};
+
 /**
  * Finds a RelationNode within the RelationTree.
- * @param relation - String that represents the relation within the RelationTree (for example: Activities.Likes.Role).
+ * @param relationNodePath - String that represents the relation within the RelationTree (for example: Activities.Likes.Role).
  * @returns {*}
  */
-ExecutionTree.prototype.getRelationNode = function (relation) {
-    if (relation) {
-        return this._relationTree[relation] || null;
+ExecutionTree.prototype.getRelationNode = function (relationNodePath) {
+    if (relationNodePath) {
+        return this._relationTree.map[relationNodePath] || null;
     } else {
         return null;
     }
 };
 
 ExecutionTree.prototype.getRootRelationNode = function () {
-    return this._relationTree[this._relationTree.$root] || null;
+    return this._relationTree.map[this._relationTree.map.$root] || null;
 };
+
+ExecutionTree.prototype.getRootNode = function () {
+	var executionTreeMap = this._map;
+    var executionTreeRoot = null;
+    for (var exNode in executionTreeMap) {
+        if (executionTreeMap.hasOwnProperty(exNode)) {
+            if (executionTreeMap[exNode].parent === '') {
+                executionTreeRoot = executionTreeMap[exNode];
+                break;
+            }
+        }
+    }
+    return executionTreeRoot;
+};
+
+ExecutionTree.prototype.getNode = function (nodeName) {
+	return this._map[nodeName];
+};
+
 /**
  * Builds the ExecutionTree from a RelationTree.
  */
 ExecutionTree.prototype.build = function () {
     //build beginning from the root
-    var relationRoot = this.getRelationNode(this._relationTree.$root);
+    var relationRoot = this.getRelationNode(this._relationTree.map.$root);
     //Setup the root of the execution tree.
     var rootExecutionNode = new ExecutionNode(null, relationRoot);//no parent node
     this.addExecutionNode(rootExecutionNode);
@@ -12143,13 +12630,13 @@ ExecutionTree.prototype.buildInternal = function (relationRoot) {
  * @param relation - The relation that will be inserted.
  */
 ExecutionTree.prototype.insertRelationNodeInExecutionTree = function (relation) {
-    var rootExecutionNode = this.getExecutionNodeOfRelation(relation.parent);
+    var rootExecutionNode = this.getExecutionNodeOfRelation(relation.parentPath);
     var childToCombine = this.tryGetChildNodeToCombine(rootExecutionNode, relation);
     if (childToCombine) {//if there is a child that we combine the relation
-        childToCombine.insertRelationNode(relation);
+        childToCombine._insertRelationNode(relation);
     } else {
         var newExecutionNode = new ExecutionNode(rootExecutionNode, relation);//create a separate execution node that will host the relation
-        rootExecutionNode.insertChildrenNode(newExecutionNode);
+        rootExecutionNode._insertChildNode(newExecutionNode);
         this.addExecutionNode(newExecutionNode);
     }
 };
@@ -12184,7 +12671,7 @@ ExecutionTree.prototype.getFilterFromExecutionNode = function (executionNode, in
     var filter = {};
     var subRelationsFilter = [];
     for (var i = 0; i < executionNode.relations.length; i++) {
-        var innerFilter = this.getFilterFromSingleRelation(this._relationTree[executionNode.relations[i]], includeArrays);
+        var innerFilter = this.getFilterFromSingleRelation(this._relationTree.map[executionNode.relations[i]], includeArrays);
         if (innerFilter) {
             subRelationsFilter.push(innerFilter);
         }
@@ -12199,6 +12686,8 @@ ExecutionTree.prototype.getFilterFromExecutionNode = function (executionNode, in
     }
     return filter;
 };
+
+
 
 /**
  * Gets filter expression from a single relation. Traverse the relation tree in order to get the "Id"s from the result of parent relation
@@ -12230,13 +12719,13 @@ ExecutionTree.prototype.getFilterFromSingleRelation = function (relation, includ
 
 /**
  * Get relation field values of parent relation in order to construct a proper filter (to create a relation).
- * @param relation - A relation instance which will get the filter.
- * @param includeArrays - Whether to include array valus of the parent items when calculating the items that will be expanded on the current level.
+ * @param relation - A RelationNode instance which will get the filter.
+ * @param includeArrays - Whether to include array values of the parent items when calculating the items that will be expanded on the current level.
  * @returns {Array} - An array of relation field values.
  */
 ExecutionTree.prototype.getRelationFieldValues = function (relation, includeArrays) {
     var parentRelationIds = [];
-    var parentRelation = this._relationTree[relation.parent];
+    var parentRelation = this._relationTree.map[relation.parentPath];
     // parentRelationResult actually is an Activity or Array of Activities
     var parentRelationResult = Array.isArray(parentRelation.result) ? parentRelation.result : [parentRelation.result];
     if (relation.isInvertedRelation) {
@@ -12281,7 +12770,7 @@ ExecutionTree.prototype.getRelationFieldValues = function (relation, includeArra
 
 module.exports = ExecutionTree;
 
-},{"./Constants":36}],38:[function(require,module,exports){
+},{"./Constants":37}],39:[function(require,module,exports){
 'use strict';
 function ExpandError(message) {
     this.name = 'ExpandError';
@@ -12290,7 +12779,7 @@ function ExpandError(message) {
 }
 ExpandError.prototype = new Error;
 module.exports = ExpandError;
-},{}],39:[function(require,module,exports){
+},{}],40:[function(require,module,exports){
 'use strict';
 var async = require('async');
 var RelationTreeBuilder = require('./RelationTreeBuilder');
@@ -12303,29 +12792,15 @@ function Processor(options) {
     this._metadataProviderFunction = options.metadataProviderFunction;
 }
 
-Processor.prototype._getExecutionTreeRoot = function (executionTree) {
-    var executionTreeRoot = null;
-    for (var exNode in executionTree) {
-        if (executionTree.hasOwnProperty(exNode)) {
-            if (executionTree[exNode].parent === '') {
-                executionTreeRoot = executionTree[exNode];
-                break;
-            }
-        }
-    }
-    return executionTreeRoot;
-};
-
 Processor.prototype._createExecuteNodeExecutor = function (relationsTree, executionTree, executionNode, expandContext) {
     var self = this;
-    var relationsTreeMap = relationsTree.map;
     return function (done) {
         var relationNode = executionTree.getRelationNode(executionNode.relations[0]);//get the relation node for the only relation of the execution node.
-        var parentRelationNode = executionTree.getRelationNode(relationNode.parent);
-        var includeArrays = !(parentRelationNode.parent && parentRelationNode.hasArrayValues); //only expand array fields if the parent relation is not an array. This means that if we have expanded a Likes (multiple to Users), we won't expand any array relations that are nested in it such as the UserComments (multiple relation to Comments).
+        var parentRelationNode = executionTree.getRelationNode(relationNode.parentPath);
+        var includeArrays = !(parentRelationNode.parentPath && parentRelationNode.hasArrayValues); //only expand array fields if the parent relation is not an array. This means that if we have expanded a Likes (multiple to Users), we won't expand any array relations that are nested in it such as the UserComments (multiple relation to Comments).
         var filter = executionTree.getFilterFromExecutionNode(executionNode, includeArrays);
 
-        var errorMessage = relationsTree.validateSingleRelation(relationNode);
+        var errorMessage = RelationTreeBuilder.validateSingleRelation(relationNode);
         if (errorMessage) {
             return done(new ExpandError(errorMessage));
         }
@@ -12338,17 +12813,22 @@ Processor.prototype._createExecuteNodeExecutor = function (relationsTree, execut
         node.take = relationNode.take;
         node.filter = filter;
         node.targetTypeName = relationNode.targetTypeName;
+		node.returnItemsCount = relationNode.returnItemsCount;
+		node.aggregate = relationNode.aggregateExpression;
 
         self._executionNodeFunction.call(null, node, expandContext, function onProcessExecutionNode(err, result) {
             if (err) {
                 return done(err);
             }
+			
+			var childRelationNode;
 
             for (var i = 0; i < executionNode.relations.length; i++) {
-                var childRelation = relationsTreeMap[executionNode.relations[i]];
-                childRelation.result = self._extractResultForRelation(relationsTreeMap[executionNode.relations[i]], result);
+                childRelationNode = executionTree.getRelationNode(executionNode.relations[i]);
+                childRelationNode.result = self._extractResultForRelation(childRelationNode, result);
             }
-            executionNode.result = childRelation.result;
+            executionNode.result = childRelationNode.result;
+			
             var arr = [];
             for (var j = 0; j < executionNode.children.length; j++) {
                 var executionTreeMap = executionTree._map;
@@ -12359,7 +12839,7 @@ Processor.prototype._createExecuteNodeExecutor = function (relationsTree, execut
     };
 };
 
-Processor.prototype._getSingleResult = function (relationsTree, relation, singleObject) {
+Processor.prototype._getSingleResult = function (relationsTree, relation, singleObject, singleObjectIndex) {
     if (!singleObject) {
         return null;
     }
@@ -12372,7 +12852,7 @@ Processor.prototype._getSingleResult = function (relationsTree, relation, single
         if (relation.children && relation.children.length > 0) {
             childRelation = relationsTree[relation.children[0]];
             childItem = this._getObjectByIdFromArray(childRelation.result, singleObject[relation.singleFieldName]);
-            return this._getSingleResult(relationsTree, childRelation, childItem);
+            return this._getSingleResult(relationsTree, childRelation, childItem, 0);
         }
         return singleObject[relation.singleFieldName];
     }
@@ -12385,22 +12865,41 @@ Processor.prototype._getSingleResult = function (relationsTree, relation, single
             childRelation = relationsTree[relation.children[j]];
             var childRelationField = childRelation.relationField;
             var userDefinedRelName = childRelation.userDefinedName;
-            if (!childRelation.isInvertedRelation) {
+            if (!childRelation.isInvertedRelation && childRelationField === userDefinedRelName) {
                 passedProperties[childRelationField] = 1;
             }
 
             var innerRelationResult = childRelation.result;
 
             if (childRelation.isInvertedRelation) {
-                for (var k = 0; k < innerRelationResult.length; k++) {
-                    this._addSingleResultToParentArray(relationsTree, childRelation, innerRelationResult[k], result, userDefinedRelName);
-                }
+				if (childRelation.aggregateExpression) {
+					result[userDefinedRelName] = innerRelationResult[singleObjectIndex];
+				} else if (childRelation.returnItemsCount) {
+					result[userDefinedRelName] = innerRelationResult;
+				} else {
+					for (var k = 0; k < innerRelationResult.length; k++) {
+						var singleResult = this._getSingleResult(relationsTree, childRelation, innerRelationResult[k], k);
+						if (singleResult) {
+							result[userDefinedRelName] = result[userDefinedRelName] || [];
+							if (Array.isArray(relation.result)) {
+								//Insert the related items in their proper place in the parent item
+								if (singleResult[childRelation.relationField] === singleObject.Id) {
+									result[userDefinedRelName].push(singleResult);
+								}
+							} else {
+								result[userDefinedRelName].push(singleResult);
+							}
+						}
+					}
+				}
             } else {
                 result[userDefinedRelName] = childRelation.isArray() ? [] : null;
 
                 if (singleObject[childRelationField]) {
                     if (Array.isArray(singleObject[childRelationField])) {
-                        if (childRelation.sortExpression) {
+						if (childRelation.aggregateExpression) {
+							result[userDefinedRelName] = innerRelationResult[singleObjectIndex];
+                        } else if (childRelation.sortExpression) {
                             // if there is a sorting we replace items using order of the query result
                             for (var p = 0; p < innerRelationResult.length; p++) {
                                 if (singleObject[childRelationField].indexOf(innerRelationResult[p].Id) > -1) {
@@ -12409,15 +12908,15 @@ Processor.prototype._getSingleResult = function (relationsTree, relation, single
                                 }
                             }
                         } else {
-                            // we just replace items getting them by id which we have
-                            for (var i = 0; i < singleObject[childRelationField].length; i++) {
-                                childItem = this._getObjectByIdFromArray(innerRelationResult, singleObject[childRelationField][i]);
-                                this._addSingleResultToParentArray(relationsTree, childRelation, childItem, result, userDefinedRelName);
-                            }
+							// we just replace items getting them by id which we have
+							for (var i = 0; i < singleObject[childRelationField].length; i++) {
+								childItem = this._getObjectByIdFromArray(innerRelationResult, singleObject[childRelationField][i]);
+								this._addSingleResultToParentArray(relationsTree, childRelation, childItem, result, userDefinedRelName);
+							}
                         }
                     } else {
                         childItem = this._getObjectByIdFromArray(innerRelationResult, singleObject[childRelationField]);
-                        result[userDefinedRelName] = this._getSingleResult(relationsTree, childRelation, childItem);
+                        result[userDefinedRelName] = this._getSingleResult(relationsTree, childRelation, childItem, 0);
                     }
                 }
             }
@@ -12426,18 +12925,19 @@ Processor.prototype._getSingleResult = function (relationsTree, relation, single
 
     // add all other fields to the result (except the relation fields which we have already replaced).
     for (var prop in singleObject) {
-        var propertyShouldBeAddedToResult = singleObject.hasOwnProperty(prop) && !passedProperties[prop] &&
-            this._fieldExistInFieldsExpression(prop, relation.originalFieldsExpression);
-        if (propertyShouldBeAddedToResult) {
-            result[prop] = singleObject[prop];
-        }
+		if (singleObject.hasOwnProperty(prop)) {
+			var propertyShouldBeAddedToResult = !passedProperties[prop] && this._fieldExistInFieldsExpression(prop, relation.originalFieldsExpression);
+			if (propertyShouldBeAddedToResult) {
+				result[prop] = singleObject[prop];
+			}
+		}
     }
 
     return result;
 };
 
 Processor.prototype._addSingleResultToParentArray = function (relationsTree, childRelation, childItem, result, userDefinedRelName) {
-    var singleResult = this._getSingleResult(relationsTree, childRelation, childItem);
+    var singleResult = this._getSingleResult(relationsTree, childRelation, childItem, 0);
     result[userDefinedRelName] = result[userDefinedRelName] || [];
     if (singleResult) {
         result[userDefinedRelName].push(singleResult);
@@ -12482,18 +12982,22 @@ Processor.prototype._fieldExistInFieldsExpression = function (field, fieldsExpre
  * @returns {Array}
  */
 Processor.prototype._extractResultForRelation = function (relation, queryResult) {
-    var result = [];
-    for (var i = 0; i < queryResult.length; i++) {
-        if (relation.parentRelationIds) {
-            if (relation.parentRelationIds.hasOwnProperty(queryResult[i].Id)) {
-                result.push(queryResult[i]);
-            }
-        }
-        if (relation.isInvertedRelation) {
-            result.push(queryResult[i]);
-        }
-    }
-    return result;
+	if (relation.returnItemsCount || relation.aggregateExpression) {
+		return queryResult;
+	} else {
+		var result = [];
+		for (var i = 0; i < queryResult.length; i++) {
+			if (relation.parentRelationIds) {
+				if (relation.parentRelationIds.hasOwnProperty(queryResult[i].Id)) {
+					result.push(queryResult[i]);
+				}
+			}
+			if (relation.isInvertedRelation) {
+				result.push(queryResult[i]);
+			}
+		}
+		return result;
+	}
 };
 
 /**
@@ -12548,64 +13052,238 @@ Processor.prototype.prepare = function (expandExpression, mainTypeName, isArray,
 Processor.prototype.expand = function (relationsTree, mainQueryResult, expandContext, done) {
     var relationsTreeMap = relationsTree.map;
     var self = this;
-    var executionTree = new ExecutionTree(relationsTreeMap);
+	
+	//Build the execution tree
+    var executionTree = new ExecutionTree(relationsTree);
     executionTree.build();
     relationsTreeMap[relationsTreeMap.$root].result = mainQueryResult;
+	
     var executionTreeMap = executionTree._map;
+    var rootExecutionNode = executionTree.getRootNode();
+    if (!rootExecutionNode) return;
 
-    var executionTreeRoot = this._getExecutionTreeRoot(executionTreeMap);
-
-    var maxQueriesCount = 20;
-    if (Object.keys(executionTreeMap).length > maxQueriesCount) {
+	//Get a list of execute definitions(queries) to execute against the DB
+	var executionList = this._getExecutionList(executionTree, rootExecutionNode, expandContext);
+	
+	//Check for the max queries limit
+    var maxQueriesCount = 25;
+    if (executionList.length > maxQueriesCount) {
         done(new ExpandError('Expand expression results in more than ' + maxQueriesCount + ' inner queries!'));
     }
+	
+	//Execute them in series, since the result of the parent relation is used to get correct filter.
+	async.forEachSeries(
+		executionList,
+		function(executeDefinition, callback) {
+			var executeOptions = executeDefinition.executeOptions;
+			var relationNode = executeDefinition.relationNode;
+			
+			//Adjust the filter for the execute definition, as it sometimes uses the result of the parent relation, which is only available after execution
+			self._adjustFilterForExecuteDefinition(executionTree, executeDefinition);
+			
+			//Apply the restrictions for expand
+			var errorMessage = RelationTreeBuilder.validateSingleRelation(relationNode, relationsTree);
+			if (errorMessage) {
+				return callback(new ExpandError(errorMessage));
+			}
+			
+			//Execute the query and set the result
+			self._executionNodeFunction.call(null, executeOptions, expandContext, function onProcessExecutionNode(err, result) {
+				if (err) {
+					return callback(err);
+				}
+				
+				var relationResult;
+				
+				if (executeDefinition.dataItem) {
+					relationResult = self._extractResultForRelation(relationNode, result);
+					if (!relationNode.result) relationNode.result = [];
+					relationNode.result.push(relationResult);
+				} else {
+					var executionNode = executeDefinition.executionNode;
+					var childRelationNode;
+					for (var i = 0; i < executionNode.relations.length; i++) {
+						childRelationNode = executionTree.getRelationNode(executionNode.relations[i]);
+						childRelationNode.result = self._extractResultForRelation(childRelationNode, result);
+					}
+					executionNode.result = childRelationNode.result;
+				}
+				
+				callback();
+			});
+		},
+		function onProcessExecutionTree(err) {
+			if (err) {
+				done(err);
+			} else {
+				var output;
+				var rootRelation = relationsTreeMap[relationsTreeMap.$root];
+				if (Array.isArray(mainQueryResult)) {
+					output = [];
+					for (var i = 0; i < mainQueryResult.length; i++) {
+						var singleResult = self._getSingleResult(relationsTreeMap, rootRelation, mainQueryResult[i], i);
+						if (singleResult) {
+							output.push(singleResult);
+						}
+					}
+				} else {
+					output = self._getSingleResult(relationsTreeMap, rootRelation, mainQueryResult, 0);
+				}
+				done(null, output);
+			}
+		}
+	);
+};
 
-    if (executionTreeRoot) {
-        var execFuncs = [];
-        for (var i = 0; i < executionTreeRoot.children.length; i++) {
-            execFuncs.push(this._createExecuteNodeExecutor(relationsTree, executionTree, executionTreeMap[executionTreeRoot.children[i]], expandContext));
-        }
-        // execFuncs are functions created for every single execution note
-        // we execute them in async, since the result of the parent relation is used to get correct filter.
-        async.series(execFuncs, function onProcessExecutionTree(err) {
-            if (err) {
-                done(err);
-            } else {
-                var output;
-                var rootRelation = relationsTreeMap[relationsTreeMap.$root];
-                if (Array.isArray(mainQueryResult)) {
-                    output = [];
-                    for (var i = 0; i < mainQueryResult.length; i++) {
-                        var singleResult = self._getSingleResult(relationsTreeMap, rootRelation, mainQueryResult[i]);
-                        if (singleResult) {
-                            output.push(singleResult);
-                        }
-                    }
-                } else {
-                    output = self._getSingleResult(relationsTreeMap, rootRelation, mainQueryResult);
-                }
-                done(null, output);
-            }
-        });
-    }
+Processor.prototype._getExecutionList = function(executionTree, executionNode, expandContext) {
+    var self = this;
+	
+	var relationTree = executionTree.getRelationTree();
+	var relationNode = executionTree.getRelationNode(executionNode.name);
+	var relationResult = relationNode.result;
+	
+	var executeDefinitions = [];
+	for (var i = 0; i < executionNode.children.length; i++) {
+		var executeDefinition;
+		
+		var childNodeName = executionNode.children[i];
+		var childExecutionNode = executionTree.getNode(childNodeName);
+		var childRelationNode = executionTree.getRelationNode(childNodeName);
+		if (childRelationNode.aggregateExpression) {
+			var relationResult = relationResult;
+			if (!Array.isArray(relationResult)) relationResult = [ relationResult ];
+			
+			for (var j = 0; j < relationResult.length; j++) {
+				executeDefinition = this._getExecuteDefinitionForItem(relationResult[j], childRelationNode, relationTree, expandContext);
+				executeDefinitions.push(executeDefinition);
+			}
+		} else {
+			executeDefinition = this._getExecuteDefinitionForNode(executionTree, childExecutionNode, expandContext);
+			executeDefinitions.push(executeDefinition);
+		}
+		
+		var childFunctions = this._getExecutionList(executionTree, childExecutionNode, expandContext);
+		executeDefinitions = executeDefinitions.concat(childFunctions);
+	}
+	
+	return executeDefinitions;
+};
+
+//Adjusts the filter for the query
+Processor.prototype._adjustFilterForExecuteDefinition = function (executionTree, executeDefinition) {
+	var filter;
+	
+	var relationNode = executeDefinition.relationNode;
+	
+	if (executeDefinition.dataItem) {
+		filter = this._getFilterFromSingleItem(executeDefinition.dataItem, relationNode);
+	} else {
+		var executionNode = executeDefinition.executionNode;
+		var parentRelationNode = executionTree.getRelationNode(relationNode.parentPath);
+		var includeArrays = !(parentRelationNode.parentPath && parentRelationNode.hasArrayValues); //only expand array fields if the parent relation is not an array. This means that if we have expanded a Likes (multiple to Users), we won't expand any array relations that are nested in it such as the UserComments (multiple relation to Comments).
+		filter = executionTree.getFilterFromExecutionNode(executionNode, includeArrays);
+	}
+
+	executeDefinition.executeOptions.filter = filter;
+};
+
+Processor.prototype._getExecuteDefinitionForItem = function (dataItem, relationNode, relationTree, expandContext) {
+	//Create ExecuteOptions object
+	var executeOptions = {};
+	executeOptions.select = relationNode.fieldsExpression;
+	executeOptions.sort = relationNode.sortExpression;
+	executeOptions.skip = relationNode.skip;
+	executeOptions.take = relationNode.take;
+	executeOptions.targetTypeName = relationNode.targetTypeName;
+	executeOptions.returnItemsCount = relationNode.returnItemsCount;
+	executeOptions.aggregate = relationNode.aggregateExpression;
+
+	return {
+		executeOptions: executeOptions,
+		relationNode: relationNode,
+		dataItem: dataItem
+	};
+};
+
+Processor.prototype._getExecuteDefinitionForNode = function (executionTree, executionNode, expandContext) {
+	//get the relation node for the only relation of the execution node.
+	var relationNode = executionTree.getRelationNode(executionNode.relations[0]);
+
+	// if we have such options executionNode should have only one relation.
+	var executeOptions = {};
+	executeOptions.select = relationNode.fieldsExpression;
+	executeOptions.sort = relationNode.sortExpression;
+	executeOptions.skip = relationNode.skip;
+	executeOptions.take = relationNode.take;
+	executeOptions.targetTypeName = relationNode.targetTypeName;
+	executeOptions.returnItemsCount = relationNode.returnItemsCount;
+	executeOptions.aggregate = relationNode.aggregateExpression;
+
+	return {
+		executeOptions: executeOptions,
+		relationNode: relationNode,
+		executionNode: executionNode
+	};
+};
+
+/**
+ * Gets filter expression from a single item for certain relation.
+ * along with user defined filters.
+ * @param dataItem - The dataItem to get filter for.
+ * @param relationNode - A RelationNode instance.
+ * @returns {*}
+ */
+Processor.prototype._getFilterFromSingleItem = function (dataItem, relationNode) {
+	var userDefinedFilter = relationNode.filterExpression;
+	var itemFilter;
+		
+	var relationFieldName = relationNode.relationField;
+	
+	if (relationNode.isInvertedRelation) {
+		itemFilter = {};
+		itemFilter[relationNode.relationField] = dataItem.Id;
+	} else {
+		var relationData = dataItem[relationFieldName];
+		if (relationData) {
+			if (Array.isArray(relationData)) {
+				itemFilter = { "Id": { "$in": relationData } };
+			} else {
+				itemFilter = { "Id": relationData };
+			}
+		} else {
+			//TODO
+			//Here we must stop the query, as there are no related items
+		}
+	}
+		
+	if (itemFilter && userDefinedFilter) {
+		return { '$and': [itemFilter, userDefinedFilter] };
+	} else if (itemFilter) {
+		return itemFilter;
+	} else if (userDefinedFilter) {
+		return userDefinedFilter;
+	} else {
+		return null;
+	}
 };
 
 Processor.Constants = Constants;
 
 module.exports = Processor;
 
-},{"./Constants":36,"./ExecutionTree":37,"./ExpandError":38,"./RelationTreeBuilder":41,"async":42}],40:[function(require,module,exports){
+},{"./Constants":37,"./ExecutionTree":38,"./ExpandError":39,"./RelationTreeBuilder":42,"async":43}],41:[function(require,module,exports){
 'use strict';
 var Constants = require('./Constants');
 var _ = require('underscore');
 var ExpandError = require('./ExpandError');
 
 function RelationNode(options) {
-    this.parent = options.parent;
+    this.parentPath = options.parent;
     this.relationField = options.relationField;
     this.path = options.path || options.parent + '.' + options.relationField;
     this.fieldsExpression = options.fieldsExpression || {};
     this.targetTypeName = options.targetTypeName;
+	//An array containing the paths(strings) of the child relations for this node
     this.children = [];
     this.isInvertedRelation = options.isInvertedRelation;
     this.isArrayRoot = options.isArrayRoot; //used for validation of cases where various expand features are disabled for a GetAll scenario.
@@ -12624,6 +13302,8 @@ function RelationNode(options) {
     this.sortExpression = expandExpression[Constants.SortExpressionName];
     this.skip = expandExpression[Constants.SkipExpressionName];
     this.take = this._getTakeLimit(expandExpression[Constants.TakeExpressionName], options.maxTakeValue);
+	this.returnItemsCount = expandExpression[Constants.ReturnItemsCountFieldName];
+	this.aggregateExpression = expandExpression[Constants.AggregateExpressionFieldName];
 }
 
 
@@ -12661,9 +13341,55 @@ RelationNode.prototype.isArray = function () {
     return this.isArrayFromMetadata || this.isInvertedRelation || this.hasArrayValues;
 };
 
+/**
+ * Creates a RelationNode object representing an external(inverted) relation.
+ * @param relationPath - A path to the external relation field (example: "Comments.ActivityId")
+ * @param expandExpression - The expand expression that contains all information about the relation
+ * @param parentRelationPath - Name of the parent relation.
+ * @returns {RelationNode}
+ */
+RelationNode.createInverted = function (relationPath, expandExpression, parentRelationPath, maxTakeValue) {
+    var relationNameParts = relationPath.split('.');
+	var targetTypeName = relationNameParts[0];
+	var relationField = relationNameParts[1];
+	
+	return RelationNode._create(relationPath, targetTypeName, relationField, parentRelationPath, maxTakeValue, expandExpression, true);
+};
+
+/**
+ * Creates a RelationNode object representing a regular relation.
+ * @param relationField - The field to expand (example: "Likes")
+ * @param expandExpression - The expand expression that contains all information about the relation
+ * @param parentRelationPath - Name of the parent relation.
+ * @returns {RelationNode}
+ */
+RelationNode.createRegular = function (relationField, expandExpression, parentRelationPath, maxTakeValue) {
+    var options = {};
+	
+	var relationPath = parentRelationPath + '.' + relationField;
+	var targetTypeName = expandExpression[Constants.TargetTypeNameFieldName];
+	
+	return RelationNode._create(relationPath, targetTypeName, relationField, parentRelationPath, maxTakeValue, expandExpression, false);
+};
+
+RelationNode._create = function(relationPath, targetTypeName, releationField, parentRelationPath, maxTakeValue, expandExpression, isInvertedRelation) {
+	var options = {};
+	
+	options.parent = parentRelationPath;
+    options.path = relationPath;
+    options.maxTakeValue = maxTakeValue;
+    options.validated = false;
+	options.expandExpression = expandExpression;
+	options.relationField = releationField;
+	options.targetTypeName = targetTypeName;
+    options.isInvertedRelation = isInvertedRelation;
+	
+    return new RelationNode(options);
+};
+
 module.exports = RelationNode;
 
-},{"./Constants":36,"./ExpandError":38,"underscore":43}],41:[function(require,module,exports){
+},{"./Constants":37,"./ExpandError":39,"underscore":44}],42:[function(require,module,exports){
 'use strict';
 var RelationNode = require('./RelationNode');
 var _ = require('underscore');
@@ -12682,7 +13408,9 @@ var possibleExpandOptions = [
     Constants.SkipExpressionName,
     Constants.TakeExpressionName,
     Constants.ParentRelationFieldName,
-    Constants.TargetTypeNameFieldName
+    Constants.TargetTypeNameFieldName,
+	Constants.ReturnItemsCountFieldName,
+	Constants.AggregateExpressionFieldName
 ];
 
 
@@ -12698,7 +13426,7 @@ var RelationTreeBuilder = function (expandExpression, mainTypeName, isArray, fie
     this.maxTakeValue = maxTakeValue;
     this._metadataProviderFunction = metadataProviderFunction;
     this.context = context;
-    this.expandExpression = this.processExpandExpression(expandExpression);
+    this.expandExpression = this._processExpandExpression(expandExpression);
     // mark the main query in order to avoid some duplication issues.
     this.map = {};
     this.map[mainTypeName] = new RelationNode({
@@ -12721,7 +13449,7 @@ var RelationTreeBuilder = function (expandExpression, mainTypeName, isArray, fie
  * @param expandExpression
  * @returns {*}
  */
-RelationTreeBuilder.prototype.processExpandExpression = function (expandExpression) {
+RelationTreeBuilder.prototype._processExpandExpression = function (expandExpression) {
     for (var property in expandExpression) {
         if (expandExpression.hasOwnProperty(property)) {
             if (typeof expandExpression[property] === 'boolean') {
@@ -12758,28 +13486,6 @@ RelationTreeBuilder.prototype.build = function (done) {
 };
 
 /**
- *
- * @param relationName - A path to the external relation collection (Comments.ActivityId)
- * @param expandExpression - The expand expression that contains all information about the relation
- * @param rootName - Name of the parent relation.
- * @returns {RelationNode}
- */
-RelationTreeBuilder.prototype.createInvertedRelation = function (relationName, expandExpression, rootName) {
-    var options = {};
-    var relationNameParts = relationName.split('.');
-    options.parent = rootName;
-    options.relationField = relationNameParts[1];
-    options.isInvertedRelation = true;
-    options.targetTypeName = relationNameParts[0];
-    options.expandExpression = expandExpression;
-    options.path = relationName;
-    options.maxTakeValue = this.maxTakeValue;
-    options.validated = false;
-
-    return new RelationNode(options);
-};
-
-/**
  * An internal method which parses the expand expression and produces a basic relation tree (only names and parent relations).
  * @param expandExpression - The expand expression which will be processed.
  * @param rootName - The name of the root relation (master query) usually the name of the requested content type (Activities).
@@ -12787,40 +13493,37 @@ RelationTreeBuilder.prototype.createInvertedRelation = function (relationName, e
 RelationTreeBuilder.prototype.buildMapInternal = function (expandExpression, rootName) {
     for (var relationName in expandExpression) {
         if (expandExpression.hasOwnProperty(relationName)) {
-            var currentExpression = expandExpression[relationName];
-
-            for (var option in currentExpression) {
-                if (currentExpression.hasOwnProperty(option) && possibleExpandOptions.indexOf(option) === -1) {
+            var fieldExpression = expandExpression[relationName];
+			
+			//Check if all options in an expand field definition are recognized
+            for (var option in fieldExpression) {
+                if (fieldExpression.hasOwnProperty(option) && possibleExpandOptions.indexOf(option) === -1) {
                     throw new ExpandError('\"' + option + '\"' + ' is not a valid option for Expand expression');
                 }
             }
 
-            if (relationName.indexOf('.') > -1) {
-                var invertedRelation = this.createInvertedRelation(relationName, currentExpression, rootName);
+            if (relationName.indexOf('.') > -1) { //If the relation is inverted
+                var invertedRelation = RelationNode.createInverted(relationName, fieldExpression, rootName, this.maxTakeValue);
+				
                 this.map[invertedRelation.path] = invertedRelation;
-                this.map[invertedRelation.parent].children.push(invertedRelation.path);
+                this.map[rootName].children.push(invertedRelation.path);
+				
                 // adds a field expression in the original fields expression in order to get the result for that field
-                RelationTreeBuilder.addFieldToFieldsExpression(this.map[invertedRelation.parent].originalFieldsExpression, invertedRelation.userDefinedName);
+                RelationTreeBuilder.addFieldToFieldsExpression(this.map[invertedRelation.parentPath].originalFieldsExpression, invertedRelation.userDefinedName);
 
                 if (expandExpression[relationName][Constants.ExpandExpressionName]) {
-                    var processedExpandExpression = this.processExpandExpression(expandExpression[relationName][Constants.ExpandExpressionName]);
+                    var processedExpandExpression = this._processExpandExpression(expandExpression[relationName][Constants.ExpandExpressionName]);
                     this.buildMapInternal(processedExpandExpression, invertedRelation.path);
                 }
             } else {
-                var options = {};
-                options.relationField = relationName;
-                options.parent = rootName;
-                options.expandExpression = currentExpression;
-                options.maxTakeValue = this.maxTakeValue;
-                options.targetTypeName = currentExpression[Constants.TargetTypeNameFieldName];
-                var relationNode = new RelationNode(options);
-                var parentNode = this.map[options.parent];
-                parentNode.children.push(relationNode.path);
+                var relationNode = RelationNode.createRegular(relationName, fieldExpression, rootName, this.maxTakeValue);
+				
                 this.map[relationNode.path] = relationNode;
+                this.map[rootName].children.push(relationNode.path);
 
-                if (currentExpression.hasOwnProperty(Constants.ExpandExpressionName)) {
-                    if (typeof(currentExpression[Constants.ExpandExpressionName]) === 'object') {
-                        this.buildMapInternal(this.processExpandExpression(currentExpression.Expand), relationNode.path);
+                if (fieldExpression.hasOwnProperty(Constants.ExpandExpressionName)) {
+                    if (typeof(fieldExpression[Constants.ExpandExpressionName]) === 'object') {
+                        this.buildMapInternal(this._processExpandExpression(fieldExpression.Expand), relationNode.path);
                     } else {
                         throw new ExpandError(relationNode.path + '.Expand must be a valid expand expression!');
                     }
@@ -12840,10 +13543,10 @@ RelationTreeBuilder.prototype.configureRelationTree = function (done) {
         var relationNames = [];
         var self = this;
 
-        for (var rel in this.map) {
-            if (this.map.hasOwnProperty(rel)) {
-                if (this.map[rel].parent !== null) {
-                    relationNames.push(this.map[rel].relationField);
+        for (var relationPath in this.map) {
+            if (this.map.hasOwnProperty(relationPath)) {
+                if (this.map[relationPath].parentPath !== null) {
+                    relationNames.push(this.map[relationPath].relationField);
                 }
             }
         }
@@ -12871,7 +13574,7 @@ RelationTreeBuilder.prototype.validateRelationTree = function (done) {
     for (var relationPath in this.map) {
         if (relationPath !== '$root' && this.map.hasOwnProperty(relationPath)) {
             var relation = this.map[relationPath];
-            errorMessage += this.validateSingleRelation(relation);
+            errorMessage += RelationTreeBuilder.validateSingleRelation(relation, this);
             this.configureFieldsExpressionsForRelation(relation);
         }
     }
@@ -12889,8 +13592,8 @@ RelationTreeBuilder.prototype.validateRelationTree = function (done) {
  * @param relation - A relation which will be configured.
  */
 RelationTreeBuilder.prototype.configureFieldsExpressionsForRelation = function (relation) {
-    if (relation.parent) {
-        var parentRelationFieldsExpression = this.map[relation.parent].fieldsExpression;
+    if (relation.parentPath) {
+        var parentRelationFieldsExpression = this.map[relation.parentPath].fieldsExpression;
         if (relation.isInvertedRelation) {
             RelationTreeBuilder.addFieldToFieldsExpression(parentRelationFieldsExpression, relation.parentRelationField);
         } else {
@@ -12902,61 +13605,75 @@ RelationTreeBuilder.prototype.configureFieldsExpressionsForRelation = function (
     } else {
         RelationTreeBuilder.addFieldToFieldsExpression(relation.fieldsExpression, Constants.IdFieldNameClient);
     }
-    RelationTreeBuilder.adjustParentRelationFieldsExpression(this.map[relation.parent], relation);
+    RelationTreeBuilder.adjustParentRelationFieldsExpression(this.map[relation.parentPath], relation);
 };
+
 
 /**
  * Validates a single relation for all build-in limitations.
- * @param relation - A relation which will be validated.
+ * @param relationNode - A relation which will be validated.
+ * @param relationTree - The whole relation tree.
  * @returns {string} - Returns an error message with all errors or empty string if there is no errors.
  */
-RelationTreeBuilder.prototype.validateSingleRelation = function (relation) {
+RelationTreeBuilder.validateSingleRelation = function (relationNode, relationTree) {
     var errorMessage = '';
+	var relationTreeMap = relationTree.map;
+	var rootRelationNode = relationTreeMap[relationTreeMap.$root];
     var EOL = '\r\n';
-    var isGetByFilterQuery = this.map[this.map.$root].isArrayRoot;
+    var isGetByFilterQuery = rootRelationNode.isArrayRoot;
 
-    if (relation.path === relation.parent) {
-        errorMessage += relation.path + ' has same parent which will cause an infinite loop.' + EOL;
+    if (relationNode.path === relationNode.parentPath) {
+        errorMessage += relationNode.path + ' has same parent which will cause an infinite loop.' + EOL;
         return errorMessage;
     }
 
-    if (relation.isArray()) {
-        var multipleQueriesCount = this.getParentMultipleRelationsCount(relation);
+    if (relationNode.isArray()) {
+        var multipleQueriesCount = RelationTreeBuilder._getParentMultipleRelationsCount(relationNode, relationTree);
         if (multipleQueriesCount > 0) {
-            errorMessage += 'Expand expression has multiple relation \"' + relation.path + '\" inside a multiple relation.';
+            errorMessage += 'Expand expression has multiple relation \"' + relationNode.path + '\" inside a multiple relation.';
             errorMessage += EOL;
         }
 
-        if (this.map[relation.parent] === this.map[this.map.$root] &&
+        if (relationTreeMap[relationNode.parentPath] === rootRelationNode &&
             isGetByFilterQuery &&
-            (relation.filterExpression || relation.sortExpression)) {
-            errorMessage += 'Filter and Sort expressions are not allowed with GetByFilter scenario.';
+            (relationNode.filterExpression || relationNode.sortExpression)) {
+            errorMessage += 'Filter and Sort are not allowed when expanding multiple items.';
+            errorMessage += EOL;
+        }
+		
+		if (relationTreeMap[relationNode.parentPath] === rootRelationNode &&
+            isGetByFilterQuery && relationNode.isInvertedRelation &&
+            relationNode.skip) {
+            errorMessage += 'Skip and Take are not supported when expanding multiple items with external relation.';
             errorMessage += EOL;
         }
 
-        if (isGetByFilterQuery && relation.isInvertedRelation) {
-            errorMessage += 'Expanding an external content type is not allowed with GetByFilter scenario.';
-            errorMessage += EOL;
-        }
+        //if (isGetByFilterQuery && relationNode.isInvertedRelation) {
+        //    errorMessage += 'Expanding an external content type is not allowed with GetByFilter scenario.';
+        //    errorMessage += EOL;
+        //}
     }
-    if (!relation.targetTypeName) {
-        errorMessage += 'Expanding relation \"' + relation.relationField + '\" has no target type name specified. You should use \"TargetTypeName\" to specify it.';
+	
+    if (!relationNode.targetTypeName) {
+        errorMessage += 'Expanding relation \"' + relationNode.relationField + '\" has no target type name specified. You should use \"TargetTypeName\" to specify it.';
         errorMessage += EOL;
     }
-    if (relation.fieldsExpression && Object.keys(relation.fieldsExpression).length && relation.singleFieldName) {
-        errorMessage += relation.path + ' ';
+	
+    if (relationNode.fieldsExpression && Object.keys(relationNode.fieldsExpression).length && relationNode.singleFieldName) {
+        errorMessage += relationNode.path + ' ';
         errorMessage += 'expand expression contains both \"Fields\" and \"SingleField\" expressions.';
         errorMessage += EOL;
     }
-    if (relation.singleFieldName) {
-        if (relation.children) {
-            if (relation.children.length > 1) {
-                errorMessage += relation.path + ' has multiple expand expressions with a single field option.' + EOL;
+	
+    if (relationNode.singleFieldName) {
+        if (relationNode.children) {
+            if (relationNode.children.length > 1) {
+                errorMessage += relationNode.path + ' has multiple expand expressions with a single field option.' + EOL;
             }
-            if (relation.children.length === 1 && this.map[relation.children[0]].relationField !== relation.singleFieldName) {
-                errorMessage += 'Expand expression ' + relation.path;
-                errorMessage += ' single field \"' + relation.singleFieldName + '\"';
-                errorMessage += ' does not match child relation field \"' + this.map[relation.children[0]].relationField + '\".';
+            if (relationNode.children.length === 1 && relationTreeMap[relationNode.children[0]].relationField !== relationNode.singleFieldName) {
+                errorMessage += 'Expand expression ' + relationNode.path;
+                errorMessage += ' single field \"' + relationNode.singleFieldName + '\"';
+                errorMessage += ' does not match child relation field \"' + relationTreeMap[relationNode.children[0]].relationField + '\".';
                 errorMessage += EOL;
             }
         }
@@ -12970,18 +13687,19 @@ RelationTreeBuilder.prototype.validateSingleRelation = function (relation) {
  * @param relation - Starting relation.
  * @returns {number} - count of all parent multiple relations
  */
-RelationTreeBuilder.prototype.getParentMultipleRelationsCount = function (relation) {
+RelationTreeBuilder._getParentMultipleRelationsCount = function (relationNode, relationTree) {
     var result = 0;
-    var relationForLoop = relation;
-    while (relationForLoop.parent) {
-        var parentRelation = this.map[relationForLoop.parent];
-        if (parentRelation.isArray() && parentRelation.parent) {
+    var currentRelation = relationNode;
+    while (currentRelation.parentPath) {
+        var parentRelation = relationTree.map[currentRelation.parentPath];
+        if (parentRelation.isArray() && parentRelation.parentPath) {
             result += 1;
         }
-        relationForLoop = parentRelation;
+        currentRelation = parentRelation;
     }
     return result;
 };
+
 
 
 /**
@@ -13067,7 +13785,7 @@ RelationTreeBuilder.getIsFieldsExpressionExclusive = function (fieldsExpression)
 
 module.exports = RelationTreeBuilder;
 
-},{"./Constants":36,"./ExpandError":38,"./RelationNode":40,"async":42,"underscore":43}],42:[function(require,module,exports){
+},{"./Constants":37,"./ExpandError":39,"./RelationNode":41,"async":43,"underscore":44}],43:[function(require,module,exports){
 (function (process){
 /*!
  * async
@@ -14195,9 +14913,9 @@ module.exports = RelationTreeBuilder;
 
 }).call(this,require('_process'))
 
-},{"_process":4}],43:[function(require,module,exports){
+},{"_process":4}],44:[function(require,module,exports){
 arguments[4][35][0].apply(exports,arguments)
-},{"dup":35}],44:[function(require,module,exports){
+},{"dup":35}],45:[function(require,module,exports){
 var EverliveError = require('./EverliveError').EverliveError;
 var constants = require('./constants');
 var _ = require('underscore');
@@ -14272,7 +14990,7 @@ module.exports = (function () {
 
     return AutoQueue;
 }());
-},{"./EverliveError":47,"./constants":59,"underscore":35}],45:[function(require,module,exports){
+},{"./EverliveError":48,"./constants":60,"underscore":35}],46:[function(require,module,exports){
 'use strict';
 
 var EventEmitter = require('events').EventEmitter;
@@ -14308,7 +15026,7 @@ var apply = function apply(obj) {
 module.exports = {
     apply: apply
 };
-},{"events":1}],46:[function(require,module,exports){
+},{"events":1}],47:[function(require,module,exports){
 var Setup = require('./Setup');
 var Data = require('./types/Data');
 var usersModule = require('./types/Users');
@@ -14387,8 +15105,12 @@ module.exports = (function () {
     function Everlive(options) {
         var self = this;
         this.setup = new Setup(options);
+        //some fields from the setup need to propagate to the initializations, e.g. the appId and apiKey
+        //since they are being set correctly when appId or apiKey is passed to the options
+        var fieldsToPropagate = _.pick(this.setup, ['appId', 'apiKey']);
+        var extendedOptions = _.extend({}, options, fieldsToPropagate);
         _.each(initializations, function (init) {
-            init.func.call(self, options);
+            init.func.call(self, extendedOptions);
         });
 
         if (Everlive.$ === null) {
@@ -14740,7 +15462,7 @@ module.exports = (function () {
     return Everlive;
 }());
 
-},{"./EventEmitterProxy":45,"./EverliveError":47,"./Push":51,"./Request":52,"./Setup":53,"./auth/Authentication":54,"./caching/caching":57,"./common":58,"./constants":59,"./helpers/helpers":62,"./mixins/mixins":68,"./offline/offline":76,"./types/Data":97,"./types/Files":98,"./types/Users":99,"./utils":100}],47:[function(require,module,exports){
+},{"./EventEmitterProxy":46,"./EverliveError":48,"./Push":52,"./Request":53,"./Setup":54,"./auth/Authentication":55,"./caching/caching":58,"./common":59,"./constants":60,"./helpers/helpers":63,"./mixins/mixins":69,"./offline/offline":77,"./types/Data":99,"./types/Files":100,"./types/Users":101,"./utils":102}],48:[function(require,module,exports){
 var EverliveErrors = {
     itemNotFound: {
         code: 801,
@@ -14898,10 +15620,11 @@ module.exports = {
     EverliveErrors: EverliveErrors,
     DeviceRegistrationError: DeviceRegistrationError
 };
-},{}],48:[function(require,module,exports){
+},{}],49:[function(require,module,exports){
 var Processor = require('./common').Processor;
 var DataQuery = require('./query/DataQuery');
 var Query = require('./query/Query');
+var AggregateQuery = require('./query/AggregateQuery');
 var EverliveError = require('./EverliveError').EverliveError;
 var constants = require('./constants');
 
@@ -14909,12 +15632,20 @@ module.exports = (function () {
     return new Processor({
         executionNodeFunction: function (node, expandContext, done) {
             var targetTypeName = node.targetTypeName.toLowerCase() === constants.FilesTypeNameLegacy ? constants.FilesTypeName : node.targetTypeName;
-
-            var query = new DataQuery({
-                operation: DataQuery.operations.Read,
-                collectionName: targetTypeName,
-                filter: new Query(node.filter, node.select, node.sort, node.skip, node.take)
-            });
+            var query;
+            if (node.aggregate) {
+                query = new DataQuery({
+                    operation: DataQuery.operations.Aggregate,
+                    collectionName: targetTypeName,
+                    query: new AggregateQuery(node.filter, node.select, node.sort, node.skip, node.take, null, node.aggregate)
+                });
+            } else {
+                query = new DataQuery({
+                    operation: DataQuery.operations.Read,
+                    collectionName: targetTypeName,
+                    query: new Query(node.filter, node.select, node.sort, node.skip, node.take)
+                });
+            }
 
             expandContext.offlineModule.processQuery(query).then(function (data) {
                 done(null, data.result);
@@ -14923,7 +15654,7 @@ module.exports = (function () {
     });
 }());
 
-},{"./EverliveError":47,"./common":58,"./constants":59,"./query/DataQuery":85,"./query/Query":87}],49:[function(require,module,exports){
+},{"./EverliveError":48,"./common":59,"./constants":60,"./query/AggregateQuery":86,"./query/DataQuery":87,"./query/Query":89}],50:[function(require,module,exports){
 module.exports = (function () {
     function Expression(operator, operands) {
         this.operator = operator;
@@ -14938,7 +15669,7 @@ module.exports = (function () {
 
     return Expression;
 }());
-},{}],50:[function(require,module,exports){
+},{}],51:[function(require,module,exports){
 module.exports = (function () {
     //TODO add a function for calculating the distances in geospatial queries
 
@@ -14955,7 +15686,7 @@ module.exports = (function () {
 
     return GeoPoint;
 }());
-},{}],51:[function(require,module,exports){
+},{}],52:[function(require,module,exports){
 var utils = require('./utils');
 var buildPromise = utils.buildPromise;
 var DeviceRegistrationResult = utils.DeviceRegistrationResult;
@@ -15319,7 +16050,7 @@ module.exports = (function () {
 
     return Push;
 }());
-},{"./EverliveError":47,"./constants":59,"./push/CurrentDevice":83,"./utils":100}],52:[function(require,module,exports){
+},{"./EverliveError":48,"./constants":60,"./push/CurrentDevice":84,"./utils":102}],53:[function(require,module,exports){
 var utils = require('./utils');
 var rsvp = require('./common').rsvp;
 var buildAuthHeader = utils.buildAuthHeader;
@@ -15331,6 +16062,7 @@ var _ = common._;
 var Headers = require('./constants').Headers;
 var isNodejs = require('./everlive.platform').isNodejs;
 var Query = require('./query/Query');
+var AggregateQuery = require('./query/AggregateQuery');
 
 module.exports = (function () {
     var _self;
@@ -15396,7 +16128,7 @@ module.exports = (function () {
         },
         // Initialize the Request object by using the passed options
         _init: function (options) {
-            _.extend(this.headers, this.buildAuthHeader(this.setup, options), this.buildQueryHeaders(options.filter), options.headers);
+            _.extend(this.headers, this.buildAuthHeader(this.setup, options), this.buildQueryHeaders(options.query), options.headers);
         },
         // Translates an Everlive.Query to request headers
         _buildQueryHeaders: function (query) {
@@ -15419,6 +16151,9 @@ module.exports = (function () {
             }
             if (query.$expand !== null) {
                 headers[Headers.expand] = JSON.stringify(query.$expand);
+            }
+            if (query.$aggregate !== null) {
+                headers[Headers.aggregate] = JSON.stringify(query.$aggregate);
             }
             return headers;
         },
@@ -15492,7 +16227,7 @@ module.exports = (function () {
 
     return Request;
 }());
-},{"./common":58,"./constants":59,"./everlive.platform":61,"./query/Query":87,"./utils":100}],53:[function(require,module,exports){
+},{"./common":59,"./constants":60,"./everlive.platform":62,"./query/AggregateQuery":86,"./query/Query":89,"./utils":102}],54:[function(require,module,exports){
 var _ = require('./common')._;
 var constants = require('./constants');
 var AuthenticationSetup = require('./auth/AuthenticationSetup');
@@ -15510,14 +16245,18 @@ module.exports = (function () {
         this.principalId = null;
         this.scheme = 'http'; // http or https
         this.parseOnlyCompleteDateTimeObjects = false;
+
         if (typeof options === 'string') {
             this.appId = options;
         } else {
             this._emulatorMode = options.emulatorMode;
             _.extend(this, options);
-            if(options.apiKey)
+            if(options.apiKey) {
                 this.appId = options.apiKey; // backward compatibility
+            }
         }
+
+        this.apiKey = this.appId;
 
         this.authentication = new AuthenticationSetup(this, options.authentication);
     }
@@ -15539,7 +16278,7 @@ module.exports = (function () {
     return Setup;
 
 }());
-},{"./auth/AuthenticationSetup":55,"./common":58,"./constants":59}],54:[function(require,module,exports){
+},{"./auth/AuthenticationSetup":56,"./common":59,"./constants":60}],55:[function(require,module,exports){
 'use strict';
 var utils = require('../utils');
 var DataQuery = require('../query/DataQuery');
@@ -15981,7 +16720,7 @@ module.exports = (function () {
     return Authentication;
 }());
 
-},{"../Everlive":46,"../EverliveError":47,"../Request":52,"../constants":59,"../query/DataQuery":85,"../storages/LocalStore":94,"../utils":100}],55:[function(require,module,exports){
+},{"../Everlive":47,"../EverliveError":48,"../Request":53,"../constants":60,"../query/DataQuery":87,"../storages/LocalStore":96,"../utils":102}],56:[function(require,module,exports){
 'use strict';
 module.exports = (function () {
     var AuthenticationSetup = function (everlive, options) {
@@ -15992,7 +16731,7 @@ module.exports = (function () {
 
     return AuthenticationSetup;
 }());
-},{}],56:[function(require,module,exports){
+},{}],57:[function(require,module,exports){
 'use strict';
 
 var constants = require('../constants');
@@ -16321,7 +17060,7 @@ CacheModule.prototype = {
 };
 
 module.exports = CacheModule;
-},{"../EverliveError":47,"../common":58,"../constants":59,"../offline/offline":76,"../offline/offlinePersisters":77,"../query/DataQuery":85,"../query/Query":87,"../utils":100,"underscore":35}],57:[function(require,module,exports){
+},{"../EverliveError":48,"../common":59,"../constants":60,"../offline/offline":77,"../offline/offlinePersisters":78,"../query/DataQuery":87,"../query/Query":89,"../utils":102,"underscore":35}],58:[function(require,module,exports){
 'use strict';
 
 var CacheModule = require('./CacheModule');
@@ -16358,7 +17097,7 @@ module.exports = {
         this.cache._initStore(options);
     }
 };
-},{"../common":58,"./CacheModule":56}],58:[function(require,module,exports){
+},{"../common":59,"./CacheModule":57}],59:[function(require,module,exports){
 (function (global){
 module.exports = (function () {
     var common = {};
@@ -16418,6 +17157,9 @@ module.exports = (function () {
     dependencyStore.Processor = require('../scripts/bs-expand-processor');
     exportDependency('Processor');
 
+    dependencyStore.AggregationTranslator = require('../scripts/bs-aggregation-translator');
+    exportDependency('AggregationTranslator');
+
     dependencyStore.rsvp = require('rsvp');
     exportDependency('RSVP', 'rsvp');
 
@@ -16430,7 +17172,7 @@ module.exports = (function () {
 }());
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 
-},{"../scripts/bs-expand-processor":39,"./everlive.platform":61,"./reqwest.nativescript":91,"./reqwest.nodejs":92,"json-stable-stringify":7,"jstimezonedetect":11,"mingo":12,"mongo-query":14,"reqwest":33,"rsvp":34,"underscore":35}],59:[function(require,module,exports){
+},{"../scripts/bs-aggregation-translator":36,"../scripts/bs-expand-processor":40,"./everlive.platform":62,"./reqwest.nativescript":93,"./reqwest.nodejs":94,"json-stable-stringify":7,"jstimezonedetect":11,"mingo":12,"mongo-query":14,"reqwest":33,"rsvp":34,"underscore":35}],60:[function(require,module,exports){
 /**
  * Constants used by the SDK* @typedef {Object} Everlive.Constants
  */
@@ -16497,7 +17239,8 @@ var constants = {
         debug: 'x-everlive-debug',
         overrideSystemFields: 'x-everlive-override-system-fields',
         sdk: 'x-everlive-sdk',
-        sync: 'x-everlive-sync'
+        sync: 'x-everlive-sync',
+        aggregate: 'x-everlive-aggregate'
     },
     //Constants for different platforms in Everlive
     Platform: {
@@ -16651,12 +17394,17 @@ constants.DataQueryOperations = {
     UserResetPassword: 'resetPassword',
     UserSetPassword: 'setPassword',
     FilesUpdateContent: 'updateContent',
-    FilesGetDownloadUrlById: 'downloadUrlById'
+    FilesGetDownloadUrlById: 'downloadUrlById',
+    Aggregate: 'aggregate'
+};
+
+constants.Aggregation = {
+    MaxDocumentsCount: 100000
 };
 
 module.exports = constants;
 
-},{}],60:[function(require,module,exports){
+},{}],61:[function(require,module,exports){
 var CryptoJS = require('node-cryptojs-aes').CryptoJS;
 var AES = CryptoJS.AES;
 
@@ -16694,7 +17442,7 @@ module.exports = (function () {
 
     return CryptographicProvider;
 }());
-},{"node-cryptojs-aes":25}],61:[function(require,module,exports){
+},{"node-cryptojs-aes":25}],62:[function(require,module,exports){
 (function (global){
 var isNativeScript = Boolean(((typeof android !== 'undefined' && android && android.widget && android.widget.Button)
 || (typeof UIButton !== 'undefined' && UIButton)));
@@ -16744,7 +17492,7 @@ module.exports = {
 };
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 
-},{}],62:[function(require,module,exports){
+},{}],63:[function(require,module,exports){
 'use strict';
 
 /**
@@ -16766,7 +17514,7 @@ if (platform.isCordova || platform.isDesktop) {
 }
 
 module.exports = helpers;
-},{"../everlive.platform":61,"./html/htmlHelper":63}],63:[function(require,module,exports){
+},{"../everlive.platform":62,"./html/htmlHelper":64}],64:[function(require,module,exports){
 'use strict';
 
 var platform = require('../../everlive.platform');
@@ -17152,7 +17900,7 @@ module.exports = (function () {
     return HtmlHelper;
 }());
 
-},{"../../EventEmitterProxy":45,"../../EverliveError":47,"../../common":58,"../../constants":59,"../../everlive.platform":61,"../../utils":100,"./htmlHelperOfflineModule":64,"./htmlHelperResponsiveModule":65}],64:[function(require,module,exports){
+},{"../../EventEmitterProxy":46,"../../EverliveError":48,"../../common":59,"../../constants":60,"../../everlive.platform":62,"../../utils":102,"./htmlHelperOfflineModule":65,"./htmlHelperResponsiveModule":66}],65:[function(require,module,exports){
 'use strict';
 
 var utils = require('../../utils');
@@ -17210,7 +17958,7 @@ module.exports = (function () {
 
     return HtmlHelperOfflineModule;
 }());
-},{"../../EverliveError":47,"../../common":58,"../../constants":59,"../../utils":100,"path":3}],65:[function(require,module,exports){
+},{"../../EverliveError":48,"../../common":59,"../../constants":60,"../../utils":102,"path":3}],66:[function(require,module,exports){
 'use strict';
 
 var common = require('../../common');
@@ -17402,7 +18150,7 @@ module.exports = (function () {
 
     return HtmlHelperResponsiveModule;
 }());
-},{"../../EverliveError":47,"../../common":58,"../../constants":59,"../../utils":100}],66:[function(require,module,exports){
+},{"../../EverliveError":48,"../../common":59,"../../constants":60,"../../utils":102}],67:[function(require,module,exports){
 /*!
  The MIT License (MIT)
  Copyright (c) 2013 Telerik AD
@@ -17424,12 +18172,11 @@ module.exports = (function () {
  */
 /*!
  Everlive SDK
- Version 1.6.0
+ Version 1.6.2
  */
 (function () {
     var Everlive = require('./Everlive');
     var platform = require('./everlive.platform');
-    var common = require('./common');
 
     if (!platform.isNativeScript && !platform.isNodejs) {
         var kendo = require('./kendo/kendo.everlive');
@@ -17442,6 +18189,7 @@ module.exports = (function () {
     Everlive.Offline = {};
 
     Everlive.Query = require('./query/Query');
+    Everlive.AggregateQuery = require('./query/AggregateQuery');
     Everlive.QueryBuilder = require('./query/QueryBuilder');
     Everlive.GeoPoint = require('./GeoPoint');
     Everlive.Constants = require('./constants');
@@ -17460,12 +18208,15 @@ module.exports = (function () {
     module.exports = Everlive;
 }());
 
-},{"./Everlive":46,"./GeoPoint":50,"./Request":52,"./common":58,"./constants":59,"./everlive.platform":61,"./kendo/kendo.everlive":67,"./offline/offlinePersisters":77,"./query/Query":87,"./query/QueryBuilder":88,"./types/Data":97,"./utils":100}],67:[function(require,module,exports){
+},{"./Everlive":47,"./GeoPoint":51,"./Request":53,"./common":59,"./constants":60,"./everlive.platform":62,"./kendo/kendo.everlive":68,"./offline/offlinePersisters":78,"./query/AggregateQuery":86,"./query/Query":89,"./query/QueryBuilder":90,"./types/Data":99,"./utils":102}],68:[function(require,module,exports){
 var QueryBuilder = require('../query/QueryBuilder');
 var Query = require('../query/Query');
+var AggregateQuery = require('../query/AggregateQuery');
 var Request = require('../Request');
 var constants = require('../constants');
-var _ = require('../common')._;
+var common = require('../common');
+var _ = common._;
+var rsvp = common.rsvp;
 var Everlive = require('../Everlive');
 var EverliveError = require('../EverliveError').EverliveError;
 
@@ -17487,6 +18238,7 @@ var operations = {
     var kendo = window.kendo;
 
     var extend = $.extend;
+    var aggrSeparator = '_';
 
     var everliveTransport = kendo.data.RemoteTransport.extend({
         init: function (options) {
@@ -17506,9 +18258,9 @@ var operations = {
             this.dataCollection = this.everlive$.data(options.typeName);
             kendo.data.RemoteTransport.fn.init.call(this, options);
         },
-
         read: function (options) {
             var methodOption = this.options['read'];
+            var self = this;
             if (methodOption && methodOption.url) {
                 return kendo.data.RemoteTransport.fn.read.call(this, options);
             }
@@ -17521,12 +18273,15 @@ var operations = {
             var id = options.data.Id;
 
             if (id) {
-                this.dataCollection.withHeaders(this.headers).withHeaders(methodHeaders).getById(id).then(options.success, options.error).catch(options.error);
+                this.dataCollection.withHeaders(this.headers).withHeaders(methodHeaders).getById(id).then(options.success, options.error);
             } else {
-                this.dataCollection.withHeaders(this.headers).withHeaders(methodHeaders).get(everliveQuery).then(options.success, options.error).catch(options.error);
+                this.dataCollection.withHeaders(this.headers).withHeaders(methodHeaders).get(everliveQuery)
+                    .then(function (getResult) {
+                        return self._readServAggregates(getResult, query, options, methodHeaders);
+                    })
+                    .then(options.success).catch(options.error);
             }
         },
-
         update: function (options) {
             var methodOption = this.options['update'];
             if (methodOption && methodOption.url) {
@@ -17545,7 +18300,6 @@ var operations = {
                     .then(options.success.bind(this, itemForUpdate), options.error).catch(options.error);
             }
         },
-
         create: function (options) {
             var methodOption = this.options['create'];
             if (methodOption && methodOption.url) {
@@ -17561,7 +18315,6 @@ var operations = {
             return this.dataCollection.withHeaders(this.headers).withHeaders(methodHeaders).create(createData)
                 .then(options.success.bind(this, createData), options.error).catch(options.error);
         },
-
         destroy: function (options) {
             var methodOption = this.options['destroy'];
             if (methodOption && methodOption.url) {
@@ -17583,7 +18336,6 @@ var operations = {
             return this.dataCollection.withHeaders(this.headers).withHeaders(methodHeaders).destroySingle(removeFilter)
                 .then(options.success, options.error).catch(options.error);
         },
-
         _subscribeToSdkEvents: function (options) {
             var self = this;
 
@@ -17593,6 +18345,24 @@ var operations = {
                     self.everlive$.on(Everlive.Constants.Events.BeforeExecute, listener);
                 }
             });
+        },
+        _readServAggregates: function (result, query, options, methodHeaders) {
+            if (options.data.aggregate) {
+                if (!options.data.hasOwnProperty('filter') && !query.$where) {
+                    throw new Error("The serverFiltering option must be enabled, when using serverAggregates.");
+                }
+                var aggregateQuery = new AggregateQuery(query.$where, null, query.$sort, query.$skip, query.$take);
+                _transformAggregatesKendoToEverlive(options.data.aggregate, aggregateQuery);
+                return this.dataCollection.withHeaders(this.headers).withHeaders(methodHeaders).aggregate(aggregateQuery)
+                    .then(function (data) {  // merge aggregation into the result
+                        var aggrResult = _transformAggregatesEverliveToKendo(options.data.aggregate, data.result[0]); // only 1 result is expected from server for aggregates, as KendoAggregates are actually totals
+                        $.extend(true, result, {aggregates: aggrResult});
+                        return result;
+                    })
+                    .catch(options.error);
+            } else {
+                return result;
+            }
         }
     });
 
@@ -17611,7 +18381,8 @@ var operations = {
                 },
                 model: {
                     id: constants.idField
-                }
+                },
+                aggregates: 'aggregates'
             }
         }
     });
@@ -17640,8 +18411,7 @@ var operations = {
                 delete data.sort;
             }
             if (data.filter) {
-                var filter = filterBuilder.build(data.filter);
-                result.$where = filter;
+                result.$where = filterBuilder.build(data.filter);
                 delete data.filter;
             }
         }
@@ -17714,9 +18484,9 @@ var operations = {
                     return new RegExp("^" + pattern, "i");
                 case 'endsWith':
                 case 'endswith':
-                    return new RegExp(pattern + "$", "i");
+                    return new RegExp(pattern + '$', 'i');
             }
-            throw new Error("Unknown operator type.");
+            throw new Error('Unknown operator type.');
         },
         _getRegexValue: function (regex) {
             return QueryBuilder.prototype._getRegexValue.call(this, regex);
@@ -17753,17 +18523,17 @@ var operations = {
                 case 'eq':
                     return null;
                 case 'neq':
-                    return "$ne";
+                    return '$ne';
                 case 'gt':
-                    return "$gt";
+                    return '$gt';
                 case 'lt':
-                    return "$lt";
+                    return '$lt';
                 case 'gte':
-                    return "$gte";
+                    return '$gte';
                 case 'lte':
-                    return "$lte";
+                    return '$lte';
             }
-            throw new Error("Unknown operator type.");
+            throw new Error('Unknown operator type.');
         }
     };
 
@@ -17776,25 +18546,15 @@ var operations = {
      * @returns {DataSource} A new instance of Kendo UI DataSource. See the Kendo UI documentation for [DataSource](http://docs.telerik.com/kendo-ui/api/javascript/data/datasource) for more information.
      * @example ```js
      * var booksDataSource = Everlive.createDataSource({
-     *   transport: {
-     *     typeName: 'Books'
-     *   }
-     * });
+         *   transport: {
+         *     typeName: 'Books'
+         *   }
+         * });
      * ```
      */
     var createDataSource = function (options) {
         options = options || {};
-        var typeName = options.typeName;
-        var everlive$ = options.dataProvider || Everlive.$;
-        if (!everlive$) {
-            throw new Error("You need to instantiate an Everlive instance in order to create a Kendo UI DataSource.");
-        }
-
-        if (!typeName) {
-            throw new Error("You need to specify a 'typeName' in order to create a Kendo UI DataSource.");
-        }
-
-        return everlive$.getKendoDataSource(typeName, options);
+        return everlive$.getKendoDataSource(options.typeName, options);
     };
 
     /**
@@ -17817,14 +18577,14 @@ var operations = {
      * @example ```js
      * var el = new Everlive('your-api-key-here');
      * var continents = Everlive.createHierarchicalDataSource({
-     *   "typeName": "Continents",
-     *   "expand": ["Countries", "Towns"]
+     *   'typeName': 'Continents',
+     *   'expand': ['Countries', 'Towns']
      * });
      *
      * ...
-     * ("#treeview").kendoTreeView({
+     * ('#treeview').kendoTreeView({
      *   dataSource: continents,
-     *   dataTextField: ["ContinentName", "CountryName", "TownName"]
+     *   dataTextField: ['ContinentName', 'CountryName', 'TownName']
      * });
      * ```
      */
@@ -17832,7 +18592,7 @@ var operations = {
         var typeName = options.typeName;
         var everlive$ = options.dataProvider || Everlive.$;
         if (!everlive$) {
-            throw new Error("You need to instantiate an Everlive instance in order to create a Kendo UI DataSource.");
+            throw new Error('You need to instantiate an Everlive instance in order to create a Kendo UI DataSource.');
         }
         if (!typeName) {
             throw new Error("You need to specify a 'typeName' in order to create a Kendo UI DataSource.");
@@ -17846,13 +18606,23 @@ var operations = {
      * @method getKendoDataSource
      * @memberOf Everlive.prototype
      * @param {String} typeName The corresponding type name for the DataSource.
-     * @param {Object} [datasourceOptions] Additional DataSource options.
+     * @param {Object} [options] Additional DataSource options.
      * @returns {DataSource}
      */
-    Everlive.prototype.getKendoDataSource = function (typeName, datasourceOptions) {
-        datasourceOptions = _.extend({}, datasourceOptions);
-        if (datasourceOptions.hasOwnProperty('serverGrouping') && datasourceOptions.serverGrouping === true) {
-            throw new EverliveError('Server Grouping is not supported.');
+    Everlive.prototype.getKendoDataSource = function (typeName, options) {
+        options = options || {};
+        var everlive$ = options.dataProvider || Everlive.$;
+        if (!everlive$) {
+            throw new Error('You need to instantiate an Everlive instance in order to create a Kendo UI DataSource.');
+        }
+        if (!typeName) {
+            throw new Error("You need to specify a 'typeName' in order to create a Kendo UI DataSource.");
+        }
+        if (options.serverGrouping) {
+            throw new Error("serverGrouping is not supported.");
+        }
+        if (options.serverAggregates && !options.serverFiltering) {
+            throw new Error("The serverFiltering option must be enabled, when using serverAggregates.");
         }
 
         var defaultEverliveOptions = {
@@ -17863,54 +18633,8 @@ var operations = {
             }
         };
 
-        var options = _.defaults(defaultEverliveOptions, datasourceOptions);
+        var options = _.defaults(defaultEverliveOptions, options);
         return new kendo.data.DataSource(options);
-    };
-
-
-    var getUrlGeneratorForNode = function (baseUrl, expandArray) {
-        var expandField = getRelationFieldForExpandNode(expandArray[expandArray.length - 1]);
-        var pathArray = expandArray.slice(0, expandArray.length - 1);
-        var pathUrl = '/_expand';
-        for (var i = 0; i < pathArray.length; i++) {
-            pathUrl += '/' + getRelationFieldForExpandNode(pathArray[i]);
-        }
-        return (function (pathUrl, expandField) {
-            return function (options) {
-                var url = baseUrl + '';
-                if (options.Id && expandField) {//if we are expanding
-                    url += pathUrl + '/' + options.Id + '/' + expandField;
-                }
-                return url;
-            }
-        }(pathUrl, expandField));
-    };
-
-    var getHeadersForExpandNode = function (expandNode) {
-        if (typeof expandNode === "string") {
-            return {};
-        } else {
-            return {
-                'X-Everlive-Filter': JSON.stringify(expandNode.filter),
-                'X-Everlive-Sort': JSON.stringify(expandNode.sort),
-                'X-Everlive-Single-Field': expandNode.singleField,
-                'X-Everlive-Skip': expandNode.skip,
-                'X-Everlive-Take': expandNode.take,
-                'X-Everlive-Fields': JSON.stringify(expandNode.fields)
-            }
-        }
-    };
-
-    var getRelationFieldForExpandNode = function (expandNode) {
-        if (typeof expandNode === "string") {
-            return expandNode;
-        } else {
-            if (expandNode.relation) {
-                return expandNode.relation;
-            } else {
-                throw new Error("You need to specify a 'relation' for an expand node when using the object notation");
-            }
-        }
     };
 
     /**
@@ -17923,9 +18647,6 @@ var operations = {
      */
     Everlive.prototype.getHierarchicalDataSource = function (typeName, dataSourceOptions) {
         dataSourceOptions = dataSourceOptions || {};
-        if (dataSourceOptions.hasOwnProperty('serverGrouping') && dataSourceOptions.serverGrouping === true) {
-            throw new EverliveError('Server Grouping is not supported.');
-        }
         var expand = dataSourceOptions.expand || dataSourceOptions;
         delete dataSourceOptions.expand;
         if (!typeName) {
@@ -17942,13 +18663,13 @@ var operations = {
             var expandNode = expand[i];
             if (isOfflineStorageEnabled) {
                 if (!$.isPlainObject(expandNode)) {
-                    throw new Error("When offline is enabled, each member of the expand array option must be an object. (Expand node index: " + i + ")");
+                    throw new Error('When offline is enabled, each member of the expand array option must be an object. (Expand node index: ' + i + ')');
                 }
                 if (!expandNode.relation) {
-                    throw new Error("When offline is enabled, each member of the expand array option must have a `relation` option set.  (Expand node index: " + i + ")");
+                    throw new Error('When offline is enabled, each member of the expand array option must have a `relation` option set.  (Expand node index: ' + i + ')');
                 }
                 if (!expandNode.typeName) {
-                    throw new Error("When offline is enabled, each member of the expand array option must have a `typeName` option set.  (Expand node index: " + i + ")");
+                    throw new Error('When offline is enabled, each member of the expand array option must have a `typeName` option set.  (Expand node index: ' + i + ')');
                 }
 
                 var headers;
@@ -17976,7 +18697,7 @@ var operations = {
                     model: {
                         hasChildren: expandNode.relation,
                         children: {
-                            type: "everlive",
+                            type: 'everlive',
                             transport: {
                                 typeName: parentType,
                                 read: {
@@ -17992,7 +18713,7 @@ var operations = {
                     model: {
                         hasChildren: getRelationFieldForExpandNode(expandNode),
                         children: {
-                            type: "everlive",
+                            type: 'everlive',
                             transport: {
                                 read: {
                                     url: getUrlGeneratorForNode(baseUrl, expand.slice(0, i + 1)),
@@ -18018,13 +18739,81 @@ var operations = {
         return new kendo.data.HierarchicalDataSource(options);
     };
 
+    var getUrlGeneratorForNode = function (baseUrl, expandArray) {
+        var expandField = getRelationFieldForExpandNode(expandArray[expandArray.length - 1]);
+        var pathArray = expandArray.slice(0, expandArray.length - 1);
+        var pathUrl = '/_expand';
+        for (var i = 0; i < pathArray.length; i++) {
+            pathUrl += '/' + getRelationFieldForExpandNode(pathArray[i]);
+        }
+        return (function (pathUrl, expandField) {
+            return function (options) {
+                var url = baseUrl + '';
+                if (options.Id && expandField) {//if we are expanding
+                    url += pathUrl + '/' + options.Id + '/' + expandField;
+                }
+                return url;
+            }
+        }(pathUrl, expandField));
+    };
+
+    var getHeadersForExpandNode = function (expandNode) {
+        if (typeof expandNode === 'string') {
+            return {};
+        } else {
+            return {
+                'X-Everlive-Filter': JSON.stringify(expandNode.filter),
+                'X-Everlive-Sort': JSON.stringify(expandNode.sort),
+                'X-Everlive-Single-Field': expandNode.singleField,
+                'X-Everlive-Skip': expandNode.skip,
+                'X-Everlive-Take': expandNode.take,
+                'X-Everlive-Fields': JSON.stringify(expandNode.fields)
+            }
+        }
+    };
+
+    var getRelationFieldForExpandNode = function (expandNode) {
+        if (typeof expandNode === 'string') {
+            return expandNode;
+        } else {
+            if (expandNode.relation) {
+                return expandNode.relation;
+            } else {
+                throw new Error("You need to specify a 'relation' for an expand node when using the object notation");
+            }
+        }
+    };
+
+    /** * passes Kendo-format aggregations to JS SDK */
+    var _transformAggregatesKendoToEverlive = function (kendoAggregates, aggregateQuery) {
+        _.each(kendoAggregates, function (element) {
+            if (element.aggregate === 'count'){
+                aggregateQuery[element.aggregate](element.aggregate + aggrSeparator + element.field);
+            } else {
+                aggregateQuery[element.aggregate](element.field, element.aggregate + aggrSeparator + element.field);
+            }
+        });
+    };
+
+    /** * reformat server-response aggregations from Everlive API format to Kendo*/
+    var _transformAggregatesEverliveToKendo = function (kendoAggregates, data) {
+        var aggrData = {};
+        _.each(kendoAggregates, function (element) {
+            if (!aggrData[element.field]) {
+                aggrData[element.field] = {};
+            }
+            aggrData[element.field][element.aggregate] = data[element.aggregate + aggrSeparator + element.field];
+        });
+        return _.isEmpty(aggrData) ? null : aggrData;
+    };
 
     module.exports = {
         createDataSource: createDataSource,
         createHierarchicalDataSource: createHierarchicalDataSource
     };
 }());
-},{"../Everlive":46,"../EverliveError":47,"../Request":52,"../common":58,"../constants":59,"../query/Query":87,"../query/QueryBuilder":88}],68:[function(require,module,exports){
+
+},{"../Everlive":47,"../EverliveError":48,"../Request":53,"../common":59,"../constants":60,"../query/AggregateQuery":86,"../query/Query":89,"../query/QueryBuilder":90}],69:[function(require,module,exports){
 var _ = require('../common')._;
 
 var deepExtend = require('./underscoreDeepExtend');
@@ -18034,7 +18823,7 @@ var isObjectEmpty = require('./underscoreIsObjectEmpty');
 _.mixin({'deepExtend': deepExtend});
 _.mixin({'compactObject': compactObject});
 _.mixin({'isEmptyObject': isObjectEmpty});
-},{"../common":58,"./underscoreCompactObject":69,"./underscoreDeepExtend":70,"./underscoreIsObjectEmpty":71}],69:[function(require,module,exports){
+},{"../common":59,"./underscoreCompactObject":70,"./underscoreDeepExtend":71,"./underscoreIsObjectEmpty":72}],70:[function(require,module,exports){
 var _ = require('underscore');
 
 //http://stackoverflow.com/questions/14058193/remove-empty-properties-falsy-values-from-object-with-underscore-js
@@ -18049,7 +18838,7 @@ module.exports = function compactObject(o) {
     return newObject;
 };
 
-},{"underscore":35}],70:[function(require,module,exports){
+},{"underscore":35}],71:[function(require,module,exports){
 /*  Copyright (C) 2012-2014  Kurt Milam - http://xioup.com | Source: https://gist.github.com/1868955
  *   
  *  Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
@@ -18151,7 +18940,7 @@ module.exports = function deepExtend(obj) {
  *   output: [1, 3, 4]
  *
  **/
-},{"../common":58}],71:[function(require,module,exports){
+},{"../common":59}],72:[function(require,module,exports){
 // http://stackoverflow.com/questions/4994201/is-object-empty
 'use strict';
 
@@ -18178,7 +18967,7 @@ function isEmpty(obj) {
 }
 
 module.exports = isEmpty;
-},{}],72:[function(require,module,exports){
+},{}],73:[function(require,module,exports){
 'use strict';
 
 var utils = require('../utils');
@@ -18628,7 +19417,7 @@ OfflineFilesModule.prototype = {
 };
 
 module.exports = OfflineFilesModule;
-},{"../AutoQueue":44,"../EverliveError":47,"../Request":52,"../common":58,"../utils":100,"node-cryptojs-aes":25,"path":3}],73:[function(require,module,exports){
+},{"../AutoQueue":45,"../EverliveError":48,"../Request":53,"../common":59,"../utils":102,"node-cryptojs-aes":25,"path":3}],74:[function(require,module,exports){
 'use strict';
 
 var EverliveErrorModule = require('../EverliveError');
@@ -18839,7 +19628,7 @@ OfflineFilesProcessor.prototype = {
 };
 
 module.exports = OfflineFilesProcessor;
-},{"../EverliveError":47,"../common":58,"../constants":59,"../everlive.platform":61,"../storages/FileStore":93,"../utils":100,"path":3}],74:[function(require,module,exports){
+},{"../EverliveError":48,"../common":59,"../constants":60,"../everlive.platform":62,"../storages/FileStore":95,"../utils":102,"path":3}],75:[function(require,module,exports){
 'use strict';
 
 var DataQuery = require('../query/DataQuery');
@@ -18858,6 +19647,7 @@ var _ = common._;
 var rsvp = common.rsvp;
 var mingo = common.Mingo;
 var mongoQuery = common.mongoQuery;
+var aggregationTranslator = common.AggregationTranslator;
 var Query = require('../query/Query');
 
 var path = require('path');
@@ -18968,6 +19758,8 @@ OfflineQueryProcessor.prototype = {
             case DataQuery.operations.DeleteById:
                 queryParams.filter._id = dataQuery.additionalOptions.id;
                 return this.remove(dataQuery, queryParams.filter);
+            case DataQuery.operations.Aggregate:
+                return this.aggregate(dataQuery, queryParams);
             default:
                 return new rsvp.Promise(function (resolve, reject) {
                     if (dataQuery.isSync) {
@@ -19554,22 +20346,22 @@ OfflineQueryProcessor.prototype = {
                 return resolve();
             }
         }).then(function () {
-                itemToRemove._id = itemToRemove._id || itemToRemove.Id;
+            itemToRemove._id = itemToRemove._id || itemToRemove.Id;
 
-                var itemExists = !!self._getById(collection, itemToRemove._id.toString());
-                if (!itemExists && !isSync) {
-                    throw new EverliveError('Cannot delete item - item with id ' + itemToRemove._id + ' does not exist.');
-                }
+            var itemExists = !!self._getById(collection, itemToRemove._id.toString());
+            if (!itemExists && !isSync) {
+                throw new EverliveError('Cannot delete item - item with id ' + itemToRemove._id + ' does not exist.');
+            }
 
-                // if the item has existed only offline or the data is syncing
-                // and the item was deleted by the conflict resolution strategy
-                var removeFromMemory = itemToRemove[constants.offlineItemsStateMarker] === offlineItemStates.created || isSync;
-                if (removeFromMemory) {
-                    self._clearItem(collection, itemToRemove);
-                } else {
-                    self._setItem(collection, itemToRemove, offlineItemStates.deleted);
-                }
-            });
+            // if the item has existed only offline or the data is syncing
+            // and the item was deleted by the conflict resolution strategy
+            var removeFromMemory = itemToRemove[constants.offlineItemsStateMarker] === offlineItemStates.created || isSync;
+            if (removeFromMemory) {
+                self._clearItem(collection, itemToRemove);
+            } else {
+                self._setItem(collection, itemToRemove, offlineItemStates.deleted);
+            }
+        });
     },
 
     _removeItems: function (dataQuery, filter, isSync) {
@@ -19665,6 +20457,30 @@ OfflineQueryProcessor.prototype = {
         }
     },
 
+    aggregate: function (dataQuery, queryParams) {
+        var self = this;
+
+        return this._getCollection(dataQuery.collectionName).then(function (collection) {
+            if (!queryParams || !queryParams.aggregate || _.isEmpty(queryParams.aggregate)) {
+                throw new EverliveError('You must specify a valid aggregation definition. Either GroupBy or Aggregate is required.');
+            }
+
+            var aggregationQuery = _.extend({}, queryParams.aggregate);
+            aggregationQuery.Filter = queryParams.filter;
+
+            var translatedPipeline = aggregationTranslator.translate(aggregationQuery, {
+                maxDocumentsCount: constants.Aggregation.MaxDocumentsCount
+            });
+
+            var collectionWithoutDeleted = _.filter(collection, function (item) {
+                return item[constants.offlineItemsStateMarker] !== constants.offlineItemStates.deleted;
+            });
+
+            var result = mingo.aggregate(collectionWithoutDeleted, translatedPipeline);
+            return self._transformOfflineResult(result, null, dataQuery);
+        });
+    },
+
     purgeAll: function (success, error) {
         var self = this;
         this._collectionCache = {};
@@ -19698,7 +20514,7 @@ OfflineQueryProcessor.prototype = {
 };
 
 module.exports = OfflineQueryProcessor;
-},{"../EverliveError":47,"../ExpandProcessor":48,"../common":58,"../constants":59,"../everlive.platform":61,"../query/DataQuery":85,"../query/Query":87,"../utils":100,"./offlineTransformations":78,"path":3}],75:[function(require,module,exports){
+},{"../EverliveError":48,"../ExpandProcessor":49,"../common":59,"../constants":60,"../everlive.platform":62,"../query/DataQuery":87,"../query/Query":89,"../utils":102,"./offlineTransformations":79,"path":3}],76:[function(require,module,exports){
 var DataQuery = require('../query/DataQuery');
 var everliveErrorModule = require('../EverliveError');
 var EverliveError = everliveErrorModule.EverliveError;
@@ -19717,6 +20533,7 @@ var OfflineQueryProcessor = require('./OfflineQueryProcessor');
 var OfflineFilesProcessor = require('./OfflineFilesProcessor');
 var OfflineFilesModule = require('./OfflineFilesModule');
 var path = require('path');
+var Query = require('../query/Query');
 
 var syncLocation = {
     server: 'server',
@@ -19962,7 +20779,8 @@ module.exports = (function () {
                             .getById(item.Id)
                             .then(function () {
                                 resolve(true);
-                            }).catch(function () {
+                            })
+                            .catch(function () {
                                 resolve(false);
                             });
                     });
@@ -20184,12 +21002,12 @@ module.exports = (function () {
         sync: function () {
             var self = this;
             self._syncResultInfo = self._syncResultInfo || {
-                syncedItems: {},
-                syncedToServer: 0,
-                syncedToClient: 0,
-                failedItems: {},
-                error: undefined // added for visibility
-            };
+                    syncedItems: {},
+                    syncedToServer: 0,
+                    syncedToClient: 0,
+                    failedItems: {},
+                    error: undefined // added for visibility
+                };
 
             if (!this.isOnline()) {
                 throw new EverliveError('Cannot synchronize while offline');
@@ -20482,7 +21300,7 @@ module.exports = (function () {
 
                     if (clientItemChanged) {
                         hasUpdateConflict = serverItem.ModifiedAt.getTime() !== offlineItem.ModifiedAt.getTime()
-                        || offlineItem[constants.offlineItemsStateMarker] === offlineItemStates.deleted;
+                            || offlineItem[constants.offlineItemsStateMarker] === offlineItemStates.deleted;
                         //TODO: when an item is removed offline its ModifiedAt field is not set, check if it needs to be set or we can use this
                     }
 
@@ -20553,7 +21371,7 @@ module.exports = (function () {
                                 var customStrategy = self.setup.conflicts.implementation;
                                 if (!customStrategy) {
                                     return reject(new EverliveError('Implementation of the conflict resolution strategy ' +
-                                    'must be provided when set to Custom'));
+                                        'must be provided when set to Custom'));
                                 }
 
                                 conflictResolutionPromises.push(new rsvp.Promise(function (resolve) {
@@ -20579,11 +21397,7 @@ module.exports = (function () {
             return new rsvp.Promise(function (resolve, reject) {
                 var dataQuery = new DataQuery({
                     collectionName: contentType,
-                    filter: {
-                        'Id': {
-                            '$in': batchIds
-                        }
-                    },
+                    query: new Query({'Id': {'$in': batchIds}}),
                     operation: DataQuery.operations.Read,
                     onSuccess: function (res) {
                         resolve(res.result);
@@ -21133,7 +21947,7 @@ module.exports = (function () {
     return OfflineModule;
 })();
 
-},{"../EverliveError":47,"../Request":52,"../common":58,"../constants":59,"../query/DataQuery":85,"../query/RequestOptionsBuilder":89,"../utils":100,"./OfflineFilesModule":72,"./OfflineFilesProcessor":73,"./OfflineQueryProcessor":74,"./offlineTransformations":78,"path":3}],76:[function(require,module,exports){
+},{"../EverliveError":48,"../Request":53,"../common":59,"../constants":60,"../query/DataQuery":87,"../query/Query":89,"../query/RequestOptionsBuilder":91,"../utils":102,"./OfflineFilesModule":73,"./OfflineFilesProcessor":74,"./OfflineQueryProcessor":75,"./offlineTransformations":79,"path":3}],77:[function(require,module,exports){
 var constants = require('../constants');
 var persisters = require('./offlinePersisters');
 var LocalStoragePersister = persisters.LocalStoragePersister;
@@ -21258,7 +22072,7 @@ module.exports = (function () {
         buildOfflineStorageOptions: buildOfflineStorageOptions
     }
 }());
-},{"../EverliveError":47,"../common":58,"../constants":59,"../encryption/CryptographicProvider":60,"../everlive.platform":61,"./OfflineStorageModule":75,"./offlinePersisters":77}],77:[function(require,module,exports){
+},{"../EverliveError":48,"../common":59,"../constants":60,"../encryption/CryptographicProvider":61,"../everlive.platform":62,"./OfflineStorageModule":76,"./offlinePersisters":78}],78:[function(require,module,exports){
 var BasePersister = require('./persisters/BasePersister');
 var LocalStoragePersister = require('./persisters/LocalStoragePersister');
 var FileSystemPersister = require('./persisters/FileSystemPersister');
@@ -21295,7 +22109,7 @@ module.exports = {
         return persister;
     }
 };
-},{"../EverliveError":47,"../common":58,"../constants":59,"./persisters/BasePersister":79,"./persisters/FileSystemPersister":80,"./persisters/LocalStoragePersister":81}],78:[function(require,module,exports){
+},{"../EverliveError":48,"../common":59,"../constants":60,"./persisters/BasePersister":80,"./persisters/FileSystemPersister":81,"./persisters/LocalStoragePersister":82}],79:[function(require,module,exports){
 'use strict';
 
 var constants = require('../constants');
@@ -21379,7 +22193,7 @@ var offlineTransformations = {
 };
 
 module.exports = offlineTransformations;
-},{"../common":58,"../constants":59}],79:[function(require,module,exports){
+},{"../common":59,"../constants":60}],80:[function(require,module,exports){
 'use strict';
 
 var EverliveError = require('../../EverliveError').EverliveError;
@@ -21489,7 +22303,7 @@ var BasePersister = (function () {
 }());
 
 module.exports = BasePersister;
-},{"../../EverliveError":47,"../../common":58,"../../utils":100}],80:[function(require,module,exports){
+},{"../../EverliveError":48,"../../common":59,"../../utils":102}],81:[function(require,module,exports){
 'use strict';
 
 var FileStore = require('../../storages/FileStore');
@@ -21616,7 +22430,7 @@ var FileSystemPersister = (function () {
 }());
 
 module.exports = FileSystemPersister;
-},{"../../EverliveError":47,"../../common":58,"../../everlive.platform":61,"../../storages/FileStore":93,"../../utils":100,"./BasePersister":79,"path":3,"util":6}],81:[function(require,module,exports){
+},{"../../EverliveError":48,"../../common":59,"../../everlive.platform":62,"../../storages/FileStore":95,"../../utils":102,"./BasePersister":80,"path":3,"util":6}],82:[function(require,module,exports){
 'use strict';
 
 var common = require('../../common');
@@ -21743,7 +22557,7 @@ var LocalStoragePersister = (function () {
 }());
 
 module.exports = LocalStoragePersister;
-},{"../../common":58,"../../storages/LocalStore":94,"./BasePersister":79,"util":6}],82:[function(require,module,exports){
+},{"../../common":59,"../../storages/LocalStore":96,"./BasePersister":80,"util":6}],83:[function(require,module,exports){
 var buildPromise = require('../utils').buildPromise;
 var EverliveError = require('../EverliveError').EverliveError;
 var Platform = require('../constants').Platform;
@@ -22404,7 +23218,7 @@ module.exports = (function () {
     return CurrentDevice;
 }());
 
-},{"../EverliveError":47,"../common":58,"../constants":59,"../utils":100}],83:[function(require,module,exports){
+},{"../EverliveError":48,"../common":59,"../constants":60,"../utils":102}],84:[function(require,module,exports){
 var platform = require('../everlive.platform');
 var _ = require('../common')._;
 
@@ -22419,7 +23233,7 @@ if (platform.isNativeScript) {
 } else {
     module.exports = _.noop;
 }
-},{"../common":58,"../everlive.platform":61,"./CordovaCurrentDevice":82,"./NativeScriptCurrentDevice":84}],84:[function(require,module,exports){
+},{"../common":59,"../everlive.platform":62,"./CordovaCurrentDevice":83,"./NativeScriptCurrentDevice":85}],85:[function(require,module,exports){
 var buildPromise = require('../utils').buildPromise;
 var EverliveError = require('../EverliveError').EverliveError;
 var Platform = require('../constants').Platform;
@@ -22950,7 +23764,150 @@ module.exports = (function () {
     return CurrentDevice;
 }());
 
-},{"../EverliveError":47,"../common":58,"../constants":59,"../utils":100,"platform":"platform"}],85:[function(require,module,exports){
+},{"../EverliveError":48,"../common":59,"../constants":60,"../utils":102,"platform":"platform"}],86:[function(require,module,exports){
+var _ = require('../common')._;
+var Query = require('./Query');
+var util = require('util');
+var EverliveError = require('../EverliveError').EverliveError;
+
+/**
+ * @class AggregateQuery
+ * @classdesc A query class used to describe a aggregation request that will be made to the {{site.TelerikBackendServices}} JavaScript API. Inherits from Query.
+ */
+var AggregateQuery = function () {
+    Query.apply(this, arguments);
+    this.aggregateExpression = {'GroupBy': [], 'Aggregate': {}};
+
+    // the aggregate expression will be the last argument when initializing the query
+    var aggregateExpression = arguments[6];
+    var groupBy;
+    var aggregate;
+    if (aggregateExpression) {
+        groupBy = aggregateExpression.GroupBy;
+        aggregate = aggregateExpression.Aggregate;
+    }
+
+    this.aggregateExpression = {'GroupBy': groupBy || [], 'Aggregate': aggregate || {}};
+};
+
+util.inherits(AggregateQuery, Query);
+
+// wrapper formatter to all aggregate functions, like min/max/sum/average/count
+AggregateQuery.prototype._aggregateFunc = function _aggregateFunc(funcName, fieldName, destName) {
+    if (typeof fieldName !== 'string' && funcName !== 'count' ) {
+        throw new EverliveError(funcName + '() accepts only string as parameter.');
+    }
+    var aggregationObj = {};
+    aggregationObj[funcName] = fieldName;
+    this.aggregateExpression.Aggregate[destName || fieldName] = aggregationObj;
+    return this;
+};
+
+/** Applies a groupBy to the current query. This allows you to group results by
+ * @memberOf AggregateQuery.prototype
+ * @method groupBy
+ * @name groupBy
+ * @param {String} field to group by
+ * @param {Array} array of strings with fields to group by
+ * @returns {AggregateQuery}
+ */
+AggregateQuery.prototype.groupBy = function (data) {
+    if (_.isArray(data)) {
+        Array.prototype.push.apply(this.aggregateExpression.GroupBy, data);
+    } else {
+        if (typeof data === 'string') {
+            this.aggregateExpression.GroupBy.push(data);
+        } else {
+            throw new EverliveError('groupBy() accepts only array or string as parameter.');
+        }
+    }
+    return this;
+};
+/** Adds aggregation function 'avg' (average) to the current query. Could set [resultFieldName]
+ * @memberOf AggregateQuery.prototype
+ * @method avg
+ * @name avg
+ * @param {String} field to apply aggregate function on
+ * @param {String} [resultFieldName] (Optional) Name of resulting field
+ * @returns {AggregateQuery}
+ */
+AggregateQuery.prototype.avg = function () {
+    Array.prototype.unshift.call(arguments, 'avg');
+    return this._aggregateFunc.apply(this, arguments);
+};
+
+/** Adds aggregation function 'count' to the current query. Could set [resultFieldName]
+ * @memberOf AggregateQuery.prototype
+ * @method count
+ * @name count
+ * @param {String} field to apply aggregate function on
+ * @param {String} [resultFieldName] (Optional) Name of resulting field
+ * @returns {AggregateQuery}
+ */
+AggregateQuery.prototype.count = function (resultFieldName) {
+    return this._aggregateFunc('count', null, resultFieldName || 'Count');
+};
+
+/** Adds aggregation function 'max' to the current query. Could set [resultFieldName]
+ * @memberOf AggregateQuery.prototype
+ * @method max
+ * @name max
+ * @param {String} field to apply aggregate function on
+ * @param {String} [resultFieldName] (Optional) Name of resulting field
+ * @returns {AggregateQuery}
+ */
+AggregateQuery.prototype.max = function () {
+    Array.prototype.unshift.call(arguments, 'max');
+    return this._aggregateFunc.apply(this, arguments);
+};
+
+/** Adds aggregation function 'min' to the current query. Could set [resultFieldName]
+ * @memberOf AggregateQuery.prototype
+ * @method min
+ * @name min
+ * @param {String} field to apply aggregate function on
+ * @param {String} [resultFieldName] (Optional) Name of resulting field
+ * @returns {AggregateQuery}
+ */
+AggregateQuery.prototype.min = function () {
+    Array.prototype.unshift.call(arguments, 'min');
+    return this._aggregateFunc.apply(this, arguments);
+};
+
+/** Adds aggregation function 'sum' to the current query. Could set [resultFieldName]
+ * @memberOf AggregateQuery.prototype
+ * @method sum
+ * @name sum
+ * @param {String} field to apply aggregate function on
+ * @param {String} [resultFieldName] (Optional) Name of resulting field
+ * @returns {AggregateQuery}
+ */
+AggregateQuery.prototype.sum = function () {
+    Array.prototype.unshift.call(arguments, 'sum');
+    return this._aggregateFunc.apply(this, arguments);
+};
+
+AggregateQuery.prototype.select = function () {
+    throw new EverliveError('select() is not supported for aggregations.');
+};
+
+AggregateQuery.prototype.skip = function () {
+    throw new EverliveError('skip() is not supported for aggregations.');
+};
+
+AggregateQuery.prototype.take = function () {
+    throw new EverliveError('take() is not supported for aggregations.');
+};
+
+AggregateQuery.prototype.order = function () {
+    throw new EverliveError('order() is not supported for aggregations.');
+};
+
+AggregateQuery.prototype.average = AggregateQuery.prototype.avg;
+
+module.exports = AggregateQuery;
+
+},{"../EverliveError":48,"../common":59,"./Query":89,"util":6}],87:[function(require,module,exports){
 var _ = require('../common')._;
 var constants = require('../constants');
 var Query = require('../query/Query');
@@ -22962,7 +23919,7 @@ module.exports = (function () {
     var DataQuery = function (config) {
         this.collectionName = config.collectionName;
         this.headers = config.headers || {};
-        this.filter = config.filter;
+        this.query = config.query;
         this.onSuccess = config.onSuccess;
         this.onError = config.onError;
         this.operation = config.operation;
@@ -22975,6 +23932,15 @@ module.exports = (function () {
         this.skipAuth = config.skipAuth; //if set to true, the sdk will not require authorization if the data query fails because of expired token. Used internally for various login methods.
         this._normalizedHeaders = null;
         this.isSync = config.isSync;
+
+        // TODO remove code below later, when we decide best strategy for queries
+        if (!config.query && config.filter && !_.isEmpty(config.filter)){
+            if (config.filter instanceof Query) {
+                this.query = config.filter;
+            } else {
+                this.query = new Query(config.filter);
+            }
+        }
     };
 
     DataQuery.prototype = {
@@ -23030,22 +23996,26 @@ module.exports = (function () {
                 var select = this.getHeaderAsJSON(Headers.select);
                 var filter = this.getHeaderAsJSON(Headers.filter);
                 var expand = this.getHeaderAsJSON(Headers.expand);
+                var aggregate = this.getHeaderAsJSON(Headers.aggregate);
 
-                if (this.filter instanceof Query) {
-                    var filterObj = this.filter.build();
+                if (this.query instanceof Query) {
+                    var filterObj = this.query.build();
                     queryParams.filter = filterObj.$where || filter || {};
                     queryParams.sort = filterObj.$sort || sort;
                     queryParams.limit = filterObj.$take || limit;
                     queryParams.skip = filterObj.$skip || skip;
                     queryParams.select = filterObj.$select || select;
                     queryParams.expand = filterObj.$expand || expand;
+                    queryParams.aggregate = filterObj.$aggregate || aggregate;
                 } else {
+                    // TODO left for backward compatibility, should be removed later
                     queryParams.filter = (this.filter || filter) || {};
                     queryParams.sort = sort;
                     queryParams.limit = limit;
                     queryParams.skip = skip;
                     queryParams.select = select;
                     queryParams.expand = expand;
+                    queryParams.aggregate = aggregate;
                 }
             }
 
@@ -23074,16 +24044,21 @@ module.exports = (function () {
             this._applyEventHeader(Headers.skip, eventQuery.skip);
             this._applyEventHeader(Headers.take, eventQuery.take);
             this._applyEventHeader(Headers.expand, eventQuery.expand);
+            this._applyEventHeader(Headers.aggregate, eventQuery.aggregate);
             this._applyEventHeader(Headers.powerFields, eventQuery.powerfields);
         },
 
         _applyEventQueryParams: function (eventQuery) {
-            this.filter = eventQuery.filter;
+            if (eventQuery.filter && !this.query) {
+                this.query = {};
+            }
+            this.query.filter = eventQuery.filter;
             this.fields = eventQuery.select;
             this.sort = eventQuery.sort;
             this.skip = eventQuery.skip;
             this.take = eventQuery.take;
             this.expand = eventQuery.expand;
+            this.aggregate = eventQuery.aggregate;
         },
 
         _applyEventQuerySettings: function (eventQuery) {
@@ -23105,7 +24080,7 @@ module.exports = (function () {
 
     return DataQuery;
 }());
-},{"../common":58,"../constants":59,"../query/Query":87,"../utils":100}],86:[function(require,module,exports){
+},{"../common":59,"../constants":60,"../query/Query":89,"../utils":102}],88:[function(require,module,exports){
 'use strict';
 
 var constants = require('../constants');
@@ -23121,6 +24096,7 @@ function applyDataQueryParameters(eventQuery, dataQuery) {
     eventQuery.skip = queryParameters.skip;
     eventQuery.take = queryParameters.limit || queryParameters.take;
     eventQuery.expand = queryParameters.expand;
+    eventQuery.aggregate = queryParameters.aggregate;
     return queryParameters;
 }
 
@@ -23176,7 +24152,7 @@ EventQuery.prototype = {
 };
 
 module.exports = EventQuery;
-},{"../constants":59}],87:[function(require,module,exports){
+},{"../constants":60}],89:[function(require,module,exports){
 var Expression = require('../Expression');
 var OperatorType = require('../constants').OperatorType;
 var WhereQuery = require('./WhereQuery');
@@ -23302,7 +24278,7 @@ module.exports = (function () {
 
     return Query;
 }());
-},{"../Expression":49,"../constants":59,"./QueryBuilder":88,"./WhereQuery":90}],88:[function(require,module,exports){
+},{"../Expression":50,"../constants":60,"./QueryBuilder":90,"./WhereQuery":92}],90:[function(require,module,exports){
 var constants = require('../constants');
 var OperatorType = constants.OperatorType;
 var _ = require('../common')._;
@@ -23322,14 +24298,15 @@ module.exports = (function () {
         // TODO merge the two objects before returning them
         build: function () {
             var query = this.query;
-            if (query.filter || query.fields || query.sort || query.toskip || query.totake || query.expandExpression) {
+            if (query.filter || query.fields || query.sort || query.toskip || query.totake || query.expandExpression){ // || query.aggregateExpression) {
                 return {
                     $where: query.filter || null,
                     $select: query.fields || null,
                     $sort: query.sort || null,
                     $skip: query.toskip || null,
                     $take: query.totake || null,
-                    $expand: query.expandExpression || null
+                    $expand: query.expandExpression || null,
+                    $aggregate: query.aggregateExpression || null
                 };
             }
             return {
@@ -23338,7 +24315,8 @@ module.exports = (function () {
                 $sort: this._buildSort(),
                 $skip: this._getSkip(),
                 $take: this._getTake(),
-                $expand: this._getExpand()
+                $expand: this._getExpand(),
+                $aggregate: this._getAggregate()
             };
         },
         _getSkip: function () {
@@ -23363,6 +24341,22 @@ module.exports = (function () {
                 }, {})
                 .value();
             return _.isEmpty(expandExpression) ? null : expandExpression;
+        },
+        _getAggregate: function () {
+            if (!this.query.aggregateExpression) {
+                return null;
+            }
+
+            // build $aggregate, delete empty aggregates, fail no aggregates at all
+            var aggregates = _.extend({}, this.query.aggregateExpression);
+            if (_.isEmpty(aggregates.GroupBy)) {
+                delete aggregates.GroupBy;
+            }
+            if (_.isEmpty(aggregates.Aggregate)) {
+                delete aggregates.Aggregate;
+            }
+
+            return aggregates;
         },
         _buildSelect: function () {
             var selectExpression = _.find(this.expr.operands, function (value, index, list) {
@@ -23652,7 +24646,7 @@ module.exports = (function () {
 
     return QueryBuilder;
 }());
-},{"../EverliveError":47,"../Expression":49,"../GeoPoint":50,"../common":58,"../constants":59}],89:[function(require,module,exports){
+},{"../EverliveError":48,"../Expression":50,"../GeoPoint":51,"../common":59,"../constants":60}],91:[function(require,module,exports){
 var DataQuery = require('./DataQuery');
 var Request = require('../Request');
 var _ = require('../common')._;
@@ -23673,7 +24667,7 @@ module.exports = (function () {
     RequestOptionsBuilder._buildBaseObject = function (dataQuery) {
         var defaultObject = {
             endpoint: RequestOptionsBuilder._buildEndpointUrl(dataQuery),
-            filter: dataQuery.filter,
+            query: dataQuery.query,
             success: dataQuery.onSuccess,
             error: dataQuery.onError,
             data: dataQuery.data,
@@ -23718,19 +24712,19 @@ module.exports = (function () {
 
     RequestOptionsBuilder[DataQuery.operations.RawUpdate] = function (dataQuery) {
         var endpoint = dataQuery.collectionName;
-        var filter = dataQuery.filter;
+        var query = dataQuery.query;
         var ofilter = null; // request options filter
 
-        if (typeof filter === 'string') {
-            endpoint += '/' + filter; // send the filter through query string
-        } else if (typeof filter === 'object') {
-            ofilter = filter; // send the filter as filter headers
+        if (typeof query === 'string') {
+            endpoint += '/' + query; // send the filter as string
+        } else if (typeof query === 'object') {
+            ofilter = query; // send the filter as filter headers
         }
 
         return RequestOptionsBuilder._build(dataQuery, {
             method: 'PUT',
             endpoint: endpoint,
-            filter: ofilter
+            query: ofilter
         });
     };
 
@@ -23750,12 +24744,12 @@ module.exports = (function () {
 
     RequestOptionsBuilder[DataQuery.operations.SetAcl] = function (dataQuery) {
         var endpoint = dataQuery.collectionName;
-        var filter = dataQuery.filter;
+        var query = dataQuery.query;
 
-        if (typeof filter === 'string') { // if filter is string than will update a single item using the filter as an identifier
-            endpoint += '/' + filter;
-        } else if (typeof filter === 'object') { // else if it is an object than we will use it's id property
-            endpoint += '/' + filter[constants.idField];
+        if (typeof query === 'string') { // if query is string than will update a single item using the query as an identifier
+            endpoint += '/' + query;
+        } else if (typeof query === 'object') { // else if it is an object than we will use it's id property
+            endpoint += '/' + query[constants.idField];
         }
         endpoint += '/_acl';
         var method, data;
@@ -23775,11 +24769,11 @@ module.exports = (function () {
 
     RequestOptionsBuilder[DataQuery.operations.SetOwner] = function (dataQuery) {
         var endpoint = dataQuery.collectionName;
-        var filter = dataQuery.filter;
-        if (typeof filter === 'string') { // if filter is string than will update a single item using the filter as an identifier
-            endpoint += '/' + filter;
-        } else if (typeof filter === 'object') { // else if it is an object than we will use it's id property
-            endpoint += '/' + filter[constants.idField];
+        var query = dataQuery.query;
+        if (typeof query === 'string') { // if query is string than will update a single item using the query as an identifier
+            endpoint += '/' + query;
+        } else if (typeof query === 'object') { // else if it is an object than we will use it's id property
+            endpoint += '/' + query[constants.idField];
         }
         endpoint += '/_owner';
 
@@ -23868,9 +24862,16 @@ module.exports = (function () {
         });
     };
 
+    RequestOptionsBuilder[DataQuery.operations.Aggregate] = function (dataQuery) {
+        return RequestOptionsBuilder._build(dataQuery, {
+            method: 'GET',
+            endpoint: dataQuery.collectionName + '/_aggregate'
+        });
+    };
+
     return RequestOptionsBuilder;
 }());
-},{"../Request":52,"../common":58,"../constants":59,"./DataQuery":85}],90:[function(require,module,exports){
+},{"../Request":53,"../common":59,"../constants":60,"./DataQuery":87}],92:[function(require,module,exports){
 var Expression = require('../Expression');
 var OperatorType = require('../constants').OperatorType;
 
@@ -24166,7 +25167,7 @@ module.exports = (function () {
 
     return WhereQuery;
 }());
-},{"../Expression":49,"../constants":59}],91:[function(require,module,exports){
+},{"../Expression":50,"../constants":60}],93:[function(require,module,exports){
 var http = require('http');
 module.exports = (function () {
     'use strict';
@@ -24216,7 +25217,7 @@ module.exports = (function () {
 
     return reqwest;
 }());
-},{"http":"http"}],92:[function(require,module,exports){
+},{"http":"http"}],94:[function(require,module,exports){
 (function (Buffer){
 var url = require('url');
 var http = require('http');
@@ -24311,7 +25312,7 @@ module.exports = (function () {
 }());
 }).call(this,require("buffer").Buffer)
 
-},{"buffer":"buffer","http":"http","https":"https","rsvp":34,"underscore":35,"url":"url","zlib":"zlib"}],93:[function(require,module,exports){
+},{"buffer":"buffer","http":"http","https":"https","rsvp":34,"underscore":35,"url":"url","zlib":"zlib"}],95:[function(require,module,exports){
 var platform = require('../everlive.platform');
 var WebFileStore = require('./WebFileStore');
 var NativeScriptFileStore = require('./NativeScriptFileStore');
@@ -24326,7 +25327,7 @@ if (platform.isNativeScript) {
 } else {
     module.exports = _.noop;
 }
-},{"../common":58,"../everlive.platform":61,"./NativeScriptFileStore":95,"./WebFileStore":96}],94:[function(require,module,exports){
+},{"../common":59,"../everlive.platform":62,"./NativeScriptFileStore":97,"./WebFileStore":98}],96:[function(require,module,exports){
 var platform = require('./../everlive.platform.js');
 var isNativeScript = platform.isNativeScript;
 var isNodejs = platform.isNodejs;
@@ -24405,7 +25406,7 @@ module.exports = (function () {
 
     return LocalStore;
 }());
-},{"./../constants":59,"./../everlive.platform.js":61,"application-settings":"application-settings","local-settings":"local-settings","node-localstorage":"node-localstorage"}],95:[function(require,module,exports){
+},{"./../constants":60,"./../everlive.platform.js":62,"application-settings":"application-settings","local-settings":"local-settings","node-localstorage":"node-localstorage"}],97:[function(require,module,exports){
 'use strict';
 
 var common = require('../common');
@@ -24526,7 +25527,7 @@ NativeScriptFileStore.prototype = {
 };
 
 module.exports = NativeScriptFileStore;
-},{"../common":58,"../utils":100,"file-system":"file-system"}],96:[function(require,module,exports){
+},{"../common":59,"../utils":102,"file-system":"file-system"}],98:[function(require,module,exports){
 'use strict';
 
 var EverliveError = require('../EverliveError').EverliveError;
@@ -24827,7 +25828,7 @@ WebFileStore.prototype = {
 };
 
 module.exports = WebFileStore;
-},{"../EverliveError":47,"../common":58,"../everlive.platform":61,"../utils":100,"path":3}],97:[function(require,module,exports){
+},{"../EverliveError":48,"../common":59,"../everlive.platform":62,"../utils":102,"path":3}],99:[function(require,module,exports){
 var buildPromise = require('../utils').buildPromise;
 var constants = require('../constants');
 var idField = constants.idField;
@@ -24842,6 +25843,7 @@ var EventQuery = require('../query/EventQuery');
 var everlivePlatform = require('../everlive.platform').platform;
 var _ = require('../common')._;
 var utils = require('../utils');
+var Query = require('../query/Query');
 
 var beforeExecuteAllowedOperations = [
     constants.DataQueryOperations.Count,
@@ -24852,6 +25854,7 @@ var beforeExecuteAllowedOperations = [
     constants.DataQueryOperations.Delete,
     constants.DataQueryOperations.DeleteById,
     constants.DataQueryOperations.ReadById,
+    constants.DataQueryOperations.Aggregate,
     constants.DataQueryOperations.RawUpdate
 ];
 
@@ -24958,8 +25961,15 @@ module.exports = (function () {
             }
             return this;
         },
+        _generateQueryFromFilter: function (filterOrQuery) {
+            if (filterOrQuery instanceof Query) {
+                return filterOrQuery;
+            } else {
+                return new Query(filterOrQuery);
+            }
+        },
 
-        /**
+    /**
          * Modifies whether the query should be invoked on the offline storage.
          * @memberOf Data.prototype
          * @method useOffline
@@ -25236,14 +26246,14 @@ module.exports = (function () {
          * @param {Function} [success] A success callback.
          * @param {Function} [error] An error callback.
          */
-        get: function (filter, success, error) {
+        get: function (filterOrQuery, success, error) {
             var self = this;
 
             return buildPromise(function (successCb, errorCb) {
                 var dataQuery = new DataQuery({
                     operation: DataQuery.operations.Read,
                     collectionName: self.collectionName,
-                    filter: filter,
+                    query: self._generateQueryFromFilter(filterOrQuery),
                     onSuccess: successCb,
                     onError: errorCb
                 });
@@ -25290,6 +26300,39 @@ module.exports = (function () {
                 return self.processDataQuery(dataQuery);
             }, success, error);
         },
+        /**
+         *  A fluent API aggregation / grouping data from server. Can accept aggregationExpression or fluent chaining rules.
+         * @memberOf Data.prototype
+         * @method aggregate
+         * @name aggregate
+         * @param {object} GroupBy fields / Aggregation functions [aggregationExpression].
+         * @returns {Promise} The promise for the request.
+         */
+        /**
+         *  A fluent API aggregation / grouping data from server. Can accept aggregationExpression or fluent chaining rules.
+         * @memberOf Data.prototype
+         * @method aggregate
+         * @name aggregate
+         * @param {object} GroupBy fields / Aggregation functions [aggregationExpression].
+         * @param {Function} [success] A success callback.
+         * @param {Function} [error] An error callback.
+         * */
+
+        aggregate: function (aggregateQuery, success, error) {
+            var self = this;
+
+            return buildPromise(function (successCb, errorCb) {
+                var aggrDataQuery = new DataQuery({
+                    operation: constants.DataQueryOperations.Aggregate,
+                    query: aggregateQuery,
+                    collectionName: self.collectionName,
+                    parse: Request.parsers.single,
+                    onSuccess: successCb,
+                    onError: errorCb
+                });
+                return self.processDataQuery(aggrDataQuery);
+            }, success, error);
+        },
 
         /**
          * Gets the count of the data items that match the filter.
@@ -25308,14 +26351,14 @@ module.exports = (function () {
          * @param {Function} [success] A success callback.
          * @param {Function} [error] An error callback.
          */
-        count: function (filter, success, error) {
+        count: function (filterOrQuery, success, error) {
             var self = this;
 
             return buildPromise(function (sucessCb, errorCb) {
                 var dataQuery = new DataQuery({
                     operation: DataQuery.operations.Count,
                     collectionName: self.collectionName,
-                    filter: filter,
+                    query: self._generateQueryFromFilter(filterOrQuery),
                     parse: Request.parsers.single,
                     onSuccess: sucessCb,
                     onError: errorCb
@@ -25403,7 +26446,7 @@ module.exports = (function () {
                 var dataQuery = new DataQuery({
                     operation: DataQuery.operations.RawUpdate,
                     collectionName: self.collectionName,
-                    filter: filter,
+                    query: filter,
                     data: attrs,
                     onSuccess: success,
                     onError: error
@@ -25412,7 +26455,7 @@ module.exports = (function () {
             }, success, error);
         },
         // TODO: Check if there is a case in which replace = true is passed to this function
-        _update: function (attrs, filter, single, replace, success, error) {
+        _update: function (attrs, filterOrQuery, single, replace, success, error) {
             var self = this;
 
             return buildPromise(function (success, error) {
@@ -25426,7 +26469,7 @@ module.exports = (function () {
                     operation: DataQuery.operations.Update,
                     collectionName: self.collectionName,
                     parse: Request.parsers.update,
-                    filter: filter,
+                    query: self._generateQueryFromFilter(filterOrQuery),
                     data: data,
                     additionalOptions: {
                         id: single ? attrs[idField] : undefined
@@ -25498,7 +26541,7 @@ module.exports = (function () {
         update: function (model, filter, success, error) {
             return this._update(model, filter, false, false, success, error);
         },
-        _destroy: function (attrs, filter, single, success, error) {
+        _destroy: function (attrs, filterOrQuery, single, success, error) {
             var self = this;
 
             return buildPromise(function (success, error) {
@@ -25508,7 +26551,7 @@ module.exports = (function () {
                 var dataQuery = new DataQuery({
                     operation: single ? DataQuery.operations.DeleteById : DataQuery.operations.Delete,
                     collectionName: self.collectionName,
-                    filter: filter,
+                    query: self._generateQueryFromFilter(filterOrQuery),
                     onSuccess: success,
                     onError: error,
                     additionalOptions: {
@@ -25615,7 +26658,7 @@ module.exports = (function () {
                     operation: DataQuery.operations.SetAcl,
                     collectionName: self.collectionName,
                     parse: Request.parsers.single,
-                    filter: filter,
+                    query: filter,
                     additionalOptions: {
                         acl: acl
                     },
@@ -25675,7 +26718,7 @@ module.exports = (function () {
                 var dataQuery = new DataQuery({
                     operation: DataQuery.operations.SetOwner,
                     collectionName: self.collectionName,
-                    filter: filter,
+                    query: filter,
                     data: {
                         Owner: ownerId
                     },
@@ -25739,7 +26782,7 @@ module.exports = (function () {
     return Data;
 }());
 
-},{"../Everlive":46,"../EverliveError":47,"../Request":52,"../common":58,"../constants":59,"../everlive.platform":61,"../query/DataQuery":85,"../query/EventQuery":86,"../query/RequestOptionsBuilder":89,"../utils":100}],98:[function(require,module,exports){
+},{"../Everlive":47,"../EverliveError":48,"../Request":53,"../common":59,"../constants":60,"../everlive.platform":62,"../query/DataQuery":87,"../query/EventQuery":88,"../query/Query":89,"../query/RequestOptionsBuilder":91,"../utils":102}],100:[function(require,module,exports){
 /**
  * @class Files
  * @protected
@@ -25947,7 +26990,7 @@ module.exports.addFilesFunctions = function addFilesFunctions(ns) {
         }, success, error);
     }
 };
-},{"../Request":52,"../query/DataQuery":85,"../utils":100}],99:[function(require,module,exports){
+},{"../Request":53,"../query/DataQuery":87,"../utils":102}],101:[function(require,module,exports){
 /**
  * @class Users
  * @extends Data
@@ -26681,7 +27724,7 @@ module.exports.addUsersFunctions = function addUsersFunctions(ns, everlive) {
         }, success, error);
     };
 };
-},{"../EverliveError":47,"../Request":52,"../common":58,"../query/DataQuery":85,"../utils":100}],100:[function(require,module,exports){
+},{"../EverliveError":48,"../Request":53,"../common":59,"../query/DataQuery":87,"../utils":102}],102:[function(require,module,exports){
 var EverliveError = require('./EverliveError').EverliveError;
 var common = require('./common');
 var _ = common._;
@@ -27153,6 +28196,6 @@ utils._inAppBuilderSimulator = function () {
 
 module.exports = utils;
 
-},{"./Everlive":46,"./EverliveError":47,"./common":58,"./everlive.platform":61,"path":3}]},{},[66])(66)
+},{"./Everlive":47,"./EverliveError":48,"./common":59,"./everlive.platform":62,"path":3}]},{},[67])(67)
 });
 //# sourceMappingURL=everlive.map

@@ -38,7 +38,6 @@ app.models.deliveriesView = {
                     }
                     
                     app.models.deliveriesView.deliveriesViewList.viewModel.dataSource.filter(currentFilter);    
-                    
                     app.models.deliveriesView.deliveriesViewList.viewModel.dataSource.read();
                 },
                 onHide: function() {
@@ -64,7 +63,7 @@ app.models.deliveriesView = {
                 if (app.data.defaultprovider.isOnline()) {
                     headers["X-Everlive-Expand"] = JSON.stringify({
                         Image: {
-                            TargetTypeName: 'Files',
+                            TargetTypeName: 'System.Files', 
                             ReturnAs: 'DeliveryImage'
                         }
                     });
@@ -147,7 +146,9 @@ app.models.deliveriesView = {
                         app.models.deliveriesView._showSection('div-no-deliveries');
                     }
                 },
-                
+                error: function(e){ // new - add error handler in the data source
+					alert("There was a data source error" + JSON.stringify(e));	
+				},
                 serverSorting: true,
                 serverPaging: true,
                 pageSize: 50,

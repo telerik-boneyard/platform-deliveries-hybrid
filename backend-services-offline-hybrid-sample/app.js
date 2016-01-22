@@ -22,6 +22,8 @@
             });
 
             onConnectivityChanged(app.isOnline());
+			// new 
+			app.data.defaultprovider.online(app.isOnline());
             app.models.deliveriesView.init();
         });
     };
