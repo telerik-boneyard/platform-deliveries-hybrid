@@ -31,7 +31,7 @@
 			"type": "bs-insert-files",
 			"message": "Uploading sample files",
 			
-			"files": "##bs-files.json##"
+			"files": "#bs-files.json#______"
 		},
 		{
 			"type": "http-request",
