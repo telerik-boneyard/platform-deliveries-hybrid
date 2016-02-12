@@ -35,10 +35,10 @@
 		},
 		{
 			"type": "http-request",
-			"message": "Executing HTTP Request"
+			"message": "Executing HTTP Request",
 			
 			"method": "POST",
-			"url": "/bs-api/v1/..."
+			"url": "/bs-api/v1/...",
 			"headers": { "Content-Type": "application/json" },
 			"body": {}
 		},
