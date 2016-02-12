@@ -1,0 +1,40 @@
+[
+	{
+		"DeliveryAddressCity": "Seattle",
+		"DeliveryAddressLine1": "8904 Aurora Ave N",
+		"DeliveryAddressPostcode": "WA 98103-3920",
+		"DeliveryItemType": "Documents",
+		"DeliveryName": "John Smith",
+		"DeliveryItem": "Tax forms",
+		"Image": "taxFormsImage",
+		"Status": 1
+	},
+	{
+		"DeliveryAddressCity": "Seattle",
+		"DeliveryAddressLine1": "4750 California Ave Sw",
+		"DeliveryAddressPostcode": "WA 98116-4413",
+		"DeliveryItemType": "Electronics",
+		"DeliveryItem": "Kindle Paperwhite",
+		"DeliveryName": "Sarah Williams",
+		"Status": 1
+	},
+	{
+		"DeliveryItemType": "Books",
+		"DeliveryAddressCity": "Seattle",
+		"DeliveryAddressPostcode": "WA 98104",
+		"DeliveryAddressLine1": "100 Main St",
+		"DeliveryItem": "Game of Thrones",
+		"DeliveryName": "Matrim Cauthon",
+		"Image": "GoTImage",
+		"Status": 1
+	},
+	{
+		"DeliveryAddressLine1": "122 Cherry St",
+		"DeliveryAddressCity": "Seattle",
+		"DeliveryAddressPostcode": "WA 98104-2206",
+		"DeliveryItemType": "Electronics",
+		"DeliveryItem": "Macbook Air",
+		"DeliveryName": "Phil Johnson",
+		"Status": 2
+	}
+]

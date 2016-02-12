@@ -1,0 +1,58 @@
+{
+	"type": {
+		"Name": "DeliveryOrder",
+		"DisplayFieldName": "DeliveryItem"
+	},
+	"fields": [
+		{
+			"Name": "DeliveryAddressLine2",
+			"DataType": 1,
+			"Title": "DeliveryAddressLine2"
+		},
+		{
+			"Name": "DeliveryAddressPostcode",
+			"DataType": 1,
+			"Title": "DeliveryAddressPostcode"
+		},
+		{
+			"Name": "DeliveryAddressLine1",
+			"DataType": 1,
+			"Title": "DeliveryAddressLine1"
+		},
+		{
+			"Name": "DeliveryAddressCity",
+			"DataType": 1,
+			"Title": "DeliveryAddressCity"
+		},
+		{
+			"Name": "DeliveryName",
+			"DataType": 1,
+			"Title": "Delivery Name"
+		},
+		{
+			"Name": "DeliveryItemType",
+			"DataType": 1,
+			"Title": "Delivery Item Type"
+		},
+		{
+			"Name": "DeliveryItem",
+			"DataType": 1,
+			"Title": "Delivery Item"
+		},
+		{
+			"Name": "Comments",
+			"DataType": 1,
+			"Title": "Comments"
+		},
+		{
+			"Name": "Status",
+			"DataType": 2,
+			"Title": "Status"
+		},
+		{
+			"Name": "Image",
+			"DataType": 6,
+			"Title": "Image"
+		}
+	]
+}

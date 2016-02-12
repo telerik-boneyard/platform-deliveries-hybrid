@@ -1,0 +1,46 @@
+{
+	"variables": {
+		"DeliveriesTypeId": "{guid}"
+	},
+	"actions": [
+		{
+			"type": "enable-ab"
+		},
+		{
+			"type": "enable-bs"
+		},
+		{
+			"type": "bs-create-type",
+			"definition": "##bs-type-delivery-order.json##"
+		},
+		{
+			"type": "bs-insert-data",
+			"message": "Creating sample users",
+			
+			"contentType": "Users",
+			"data": "##bs-data-users.json##"
+		},
+		{
+			"type": "bs-insert-data",
+			"message": "Creating sample data",
+			
+			"contentType": "DeliveryOrder",
+			"data": "##bs-data-delivery-order.json##"
+		},
+		{
+			"type": "bs-insert-files",
+			"message": "Uploading sample files",
+			
+			"files": "##bs-files.json##"
+		},
+		{
+			"type": "http-request",
+			"message": "Executing HTTP Request"
+			
+			"method": "POST",
+			"url": "/bs-api/v1/..."
+			"headers": { "Content-Type": "application/json" },
+			"body": {}
+		},
+	]
+}
