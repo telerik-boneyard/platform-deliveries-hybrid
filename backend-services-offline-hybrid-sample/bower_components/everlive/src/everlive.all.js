@@ -16090,7 +16090,9 @@ var guardUnset = utils.guardUnset;
 var common = require('./common');
 var reqwest = common.reqwest;
 var _ = common._;
-var Headers = require('./constants').Headers;
+var Constants = require('./constants');
+var Headers = Constants.Headers;
+var EncodableHeaders = Constants.EncodableHeaders;
 var isNodejs = require('./everlive.platform').isNodejs;
 var Query = require('./query/Query');
 var AggregateQuery = require('./query/AggregateQuery');
@@ -16127,7 +16129,6 @@ module.exports = (function () {
         });
 
         _.extend(this, options);
-        delete this.headers[Headers.filter];
         _self = this;
         this._init(options);
     }
@@ -16141,19 +16142,17 @@ module.exports = (function () {
         // If there is a logged in user for the Everlive instance then her/his authentication will be used.
         buildAuthHeader: buildAuthHeader,
         // Builds the URL of the target Everlive service
-        buildUrl: function buildUrl() {
-            var queryString = '';
-
-            if (this.query && this.query.filter) {
-                queryString = '?filter=' + JSON.stringify(this.query.filter);
-            }
-
-            return utils.buildUrl(this.setup) + this.endpoint + queryString;
+        buildUrl: function buildUrl(setup) {
+            return utils.buildUrl(setup);
         },
         // Processes the given query to return appropriate headers to be used by the request
         buildQueryHeaders: function buildQueryHeaders(query) {
-            if (query && query instanceof Query) {
-                return Request.prototype._buildQueryHeaders(query);
+            if (query) {
+                if (query instanceof Query) {
+                    return Request.prototype._buildQueryHeaders(query);
+                } else {
+                    return Request.prototype._buildFilterHeader(query.filter);
+                }
             } else {
                 return {};
             }
@@ -16161,15 +16160,15 @@ module.exports = (function () {
         // Initialize the Request object by using the passed options
         _init: function (options) {
             _.extend(this.headers, this.buildAuthHeader(this.setup, options), this.buildQueryHeaders(options.query));
+            this.encodeHeaders();
         },
         // Translates an Everlive.Query to request headers
         _buildQueryHeaders: function (query) {
             query = query.build();
             var headers = {};
-
-            // query filter has been moved to the URL of the request
-            // in order to avoid character encoding difficulties
-
+            if (query.$where !== null) {
+                headers[Headers.filter] = JSON.stringify(query.$where);
+            }
             if (query.$select !== null) {
                 headers[Headers.select] = JSON.stringify(query.$select);
             }
@@ -16189,6 +16188,20 @@ module.exports = (function () {
                 headers[Headers.aggregate] = JSON.stringify(query.$aggregate);
             }
             return headers;
+        },
+        // Creates a header from a simple filter
+        _buildFilterHeader: function (filter) {
+            var headers = {};
+            headers[Headers.filter] = JSON.stringify(filter);
+            return headers;
+        },
+        encodeHeaders: function encodeHeaders () {
+            var headers = this.headers;
+            _.each(EncodableHeaders, function (headerName) {
+                if (headers[headerName] !== undefined) {
+                    headers[headerName] = encodeURIComponent(headers[headerName]);
+                }
+            });
         }
     };
 
@@ -16213,7 +16226,7 @@ module.exports = (function () {
 
     if (typeof Request.sendRequest === 'undefined') {
         Request.sendRequest = function (request) {
-            var url = request.buildUrl();
+            var url = request.buildUrl(request.setup) + request.endpoint;
             url = utils.disableRequestCache(url, request.method);
             request.method = request.method || 'GET';
             var data = request.method === 'GET' ? request.data : JSON.stringify(request.data);
@@ -17274,7 +17287,8 @@ var constants = {
         overrideSystemFields: 'x-everlive-override-system-fields',
         sdk: 'x-everlive-sdk',
         sync: 'x-everlive-sync',
-        aggregate: 'x-everlive-aggregate'
+        aggregate: 'x-everlive-aggregate',
+        customParameters: 'x-everlive-custom-parameters'
     },
     //Constants for different platforms in Everlive
     Platform: {
@@ -17441,6 +17455,13 @@ constants.Push = {
     NotificationsType: 'Push/Notifications',
     DevicesType: 'Push/Devices'
 };
+
+constants.EncodableHeaders = [
+    constants.Headers.filter,
+    constants.Headers.expand,
+    constants.Headers.powerFields,
+    constants.Headers.customParameters
+];
 
 module.exports = constants;
 
@@ -18206,10 +18227,12 @@ module.exports = (function () {
  */
 /*!
  Everlive SDK
- Version 1.6.6
+ Version 1.6.7
  */
 (function () {
     var Everlive = require('./Everlive');
+    Everlive.version = '1.6.7';
+
     var platform = require('./everlive.platform');
 
     if (!platform.isNativeScript && !platform.isNodejs) {
