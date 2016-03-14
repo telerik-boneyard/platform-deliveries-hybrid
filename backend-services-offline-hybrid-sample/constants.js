@@ -22,3 +22,13 @@ Constants.OrderStatusNames = [
     { name: "Refused", value: Constants.OrderStatus.Refused},
     { name: "Problem", value: Constants.OrderStatus.Problem}
 ];
+
+Constants.ErrorCodes = {
+    ContentTypeNotFound: 611,
+    InvalidAppId: 607
+};
+
+Constants.KeysLength = {
+    AppId: 16,
+    MasterKey: 32
+};
