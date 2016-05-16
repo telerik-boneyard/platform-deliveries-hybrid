@@ -1,3 +1,29 @@
+/*
+The MIT License (MIT)
+
+Copyright (c) 2013 Telerik AD
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.y distributed under the MIT license.
+
+Everlive SDK Version: 1.6.11
+*/
+
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.Everlive = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -565,6 +591,9 @@ var currentQueue;
 var queueIndex = -1;
 
 function cleanUpNextTick() {
+    if (!draining || !currentQueue) {
+        return;
+    }
     draining = false;
     if (currentQueue.length) {
         queue = currentQueue.concat(queue);
@@ -14990,7 +15019,7 @@ module.exports = (function () {
 
     return AutoQueue;
 }());
-},{"./EverliveError":48,"./constants":60,"underscore":35}],46:[function(require,module,exports){
+},{"./EverliveError":48,"./constants":61,"underscore":35}],46:[function(require,module,exports){
 'use strict';
 
 var EventEmitter = require('events').EventEmitter;
@@ -15046,6 +15075,7 @@ var EverliveError = require('./EverliveError').EverliveError;
 var EverliveErrors = require('./EverliveError').EverliveErrors;
 var helpers = require('./helpers/helpers');
 var EventEmitterProxy = require('./EventEmitterProxy');
+var BusinessLogicModule = require('./business-logic/BusinessLogic');
 
 // Registering mixins:
 var mixins = require('./mixins/mixins');
@@ -15426,6 +15456,14 @@ module.exports = (function () {
          * @member {Push} push
          */
         this.push = new Push(this);
+
+        /**
+         * @memberOf Everlive
+         * @instance
+         * @description An instance of the [BusinessLogic]{@link BusinessLogic} class for invoking cloud functions and stored procedures through the SDK
+         * @member {businessLogic} businessLogic
+         */
+        this.businessLogic = new BusinessLogicModule(this.setup);
     };
 
     var initAuthentication = function initAuthentication() {
@@ -15464,7 +15502,7 @@ module.exports = (function () {
     return Everlive;
 }());
 
-},{"./EventEmitterProxy":46,"./EverliveError":48,"./Push":52,"./Request":53,"./Setup":54,"./auth/Authentication":55,"./caching/caching":58,"./common":59,"./constants":60,"./helpers/helpers":63,"./mixins/mixins":69,"./offline/offline":77,"./types/Data":99,"./types/Files":100,"./types/Users":101,"./utils":102}],48:[function(require,module,exports){
+},{"./EventEmitterProxy":46,"./EverliveError":48,"./Push":52,"./Request":53,"./Setup":54,"./auth/Authentication":55,"./business-logic/BusinessLogic":57,"./caching/caching":59,"./common":60,"./constants":61,"./helpers/helpers":64,"./mixins/mixins":70,"./offline/offline":78,"./types/Data":100,"./types/Files":101,"./types/Users":102,"./utils":103}],48:[function(require,module,exports){
 var EverliveErrors = {
     itemNotFound: {
         code: 801,
@@ -15486,12 +15524,28 @@ var EverliveErrors = {
         code: 10004,
         message: 'Synchronization cancelled by user.'
     },
+    syncErrorUnknown: {
+        code: 10005,
+        message: 'An unknown error occurred while synchronizing. Please make sure there is internet connectivity.'
+    },
     operationNotSupportedOffline: {
         code: 20000 // the error message is created dynamically based on the query filter for offline storage
     },
     invalidId: {
         code: 20001,
         message: 'Invalid or missing Id in model.'
+    },
+    bodyWithGetRequestNotSupported: {
+        code: 601,
+        message: 'Sending a request body is not supported for "GET" requests.'
+    },
+    invalidOrMissingFunctionName: {
+        code: 601,
+        message: 'Invalid or missing cloud function name.'
+    },
+    invalidOrMissingProcedureName: {
+        code: 601,
+        message: 'Invalid or missing procedure name.'
     },
     generalDatabaseError: {
         code: 107,
@@ -15661,7 +15715,7 @@ module.exports = (function () {
     });
 }());
 
-},{"./EverliveError":48,"./common":59,"./constants":60,"./query/AggregateQuery":86,"./query/DataQuery":87,"./query/Query":89}],50:[function(require,module,exports){
+},{"./EverliveError":48,"./common":60,"./constants":61,"./query/AggregateQuery":87,"./query/DataQuery":88,"./query/Query":90}],50:[function(require,module,exports){
 module.exports = (function () {
     function Expression(operator, operands) {
         this.operator = operator;
@@ -16081,7 +16135,7 @@ module.exports = (function () {
 
     return Push;
 }());
-},{"./EverliveError":48,"./constants":60,"./everlive.platform":62,"./push/CurrentDevice":84,"./utils":102}],53:[function(require,module,exports){
+},{"./EverliveError":48,"./constants":61,"./everlive.platform":63,"./push/CurrentDevice":85,"./utils":103}],53:[function(require,module,exports){
 var utils = require('./utils');
 var rsvp = require('./common').rsvp;
 var buildAuthHeader = utils.buildAuthHeader;
@@ -16090,9 +16144,9 @@ var guardUnset = utils.guardUnset;
 var common = require('./common');
 var reqwest = common.reqwest;
 var _ = common._;
-var Constants = require('./constants');
-var Headers = Constants.Headers;
-var EncodableHeaders = Constants.EncodableHeaders;
+var constants = require('./constants');
+var Headers = constants.Headers;
+var EncodableHeaders = constants.EncodableHeaders;
 var isNodejs = require('./everlive.platform').isNodejs;
 var Query = require('./query/Query');
 var AggregateQuery = require('./query/AggregateQuery');
@@ -16113,7 +16167,7 @@ module.exports = (function () {
         // TODO success and error callbacks should be uniformed for all ajax libs
         this.success = null;
         this.error = null;
-        this.parse = Request.parsers.simple;
+        this.parse = options.isCustomRequest ? Request.parsers.customRequest : Request.parsers.simple;
 
         var _headers = {};
         //make sure that the headers are always normalized
@@ -16142,16 +16196,22 @@ module.exports = (function () {
         // If there is a logged in user for the Everlive instance then her/his authentication will be used.
         buildAuthHeader: buildAuthHeader,
         // Builds the URL of the target Everlive service
-        buildUrl: function buildUrl(setup) {
-            return utils.buildUrl(setup);
+        buildUrl: function buildUrl() {
+            var url = utils.buildUrl(this.setup) + this.endpoint;
+
+            if (_.size(this.queryStringParams)) {
+                url = url + '?' + utils.toQueryString(this.queryStringParams);
+            }
+
+            return url;
         },
         // Processes the given query to return appropriate headers to be used by the request
         buildQueryHeaders: function buildQueryHeaders(query) {
             if (query) {
                 if (query instanceof Query) {
-                    return Request.prototype._buildQueryHeaders(query);
+                    return this._buildQueryHeaders(query);
                 } else {
-                    return Request.prototype._buildFilterHeader(query.filter);
+                    return this._buildFilterHeader(query.filter);
                 }
             } else {
                 return {};
@@ -16160,42 +16220,59 @@ module.exports = (function () {
         // Initialize the Request object by using the passed options
         _init: function (options) {
             _.extend(this.headers, this.buildAuthHeader(this.setup, options), this.buildQueryHeaders(options.query));
+            this.clearEmptyHeaders();
             this.encodeHeaders();
         },
         // Translates an Everlive.Query to request headers
         _buildQueryHeaders: function (query) {
             query = query.build();
             var headers = {};
-            if (query.$where !== null) {
-                headers[Headers.filter] = JSON.stringify(query.$where);
-            }
-            if (query.$select !== null) {
-                headers[Headers.select] = JSON.stringify(query.$select);
-            }
-            if (query.$sort !== null) {
-                headers[Headers.sort] = JSON.stringify(query.$sort);
-            }
-            if (query.$skip !== null) {
-                headers[Headers.skip] = query.$skip;
-            }
-            if (query.$take !== null) {
-                headers[Headers.take] = query.$take;
-            }
-            if (query.$expand !== null) {
-                headers[Headers.expand] = JSON.stringify(query.$expand);
-            }
-            if (query.$aggregate !== null) {
-                headers[Headers.aggregate] = JSON.stringify(query.$aggregate);
-            }
+            this._setHeader(headers, query.$where, Headers.filter);
+            this._setHeader(headers, query.$select, Headers.select);
+            this._setHeader(headers, query.$sort, Headers.sort);
+            this._setHeader(headers, query.$skip, Headers.skip);
+            this._setHeader(headers, query.$take, Headers.take);
+            this._setHeader(headers, query.$expand, Headers.expand);
+            this._setHeader(headers, query.$aggregate, Headers.aggregate);
+
             return headers;
         },
         // Creates a header from a simple filter
         _buildFilterHeader: function (filter) {
             var headers = {};
-            headers[Headers.filter] = JSON.stringify(filter);
+            this._setHeader(headers, filter, Headers.filter);
             return headers;
         },
-        encodeHeaders: function encodeHeaders () {
+        _setHeader: function _setHeader(headers, inputHeader, targetHeaderName) {
+            //make sure not to put nulls or something of the sort as a header
+            if (inputHeader) {
+                headers[targetHeaderName] = JSON.stringify(inputHeader);
+            }
+        },
+        clearEmptyHeaders: function clearEmptyHeaders() {
+            var headers = this.headers;
+            _.each(headers, function (headerString, key) {
+                var header;
+                try {
+                    //try to parse the header as object
+                    header = JSON.parse(headerString);
+                    //make sure that the header is a string if it is parsed as a number
+                    if (!_.isObject(header)) {
+                        header += '';
+                    }
+                }
+                catch(e) {
+                    //if it is not an object it probably should stay that way
+                    header = headerString;
+                }
+
+                //if the header is an empty string or empty object it will not be sent
+                if (_.isEmpty(header)) {
+                    delete headers[key];
+                }
+            });
+        },
+        encodeHeaders: function encodeHeaders() {
             var headers = this.headers;
             _.each(EncodableHeaders, function (headerName) {
                 if (headers[headerName] !== undefined) {
@@ -16206,30 +16283,40 @@ module.exports = (function () {
     };
 
     var parseOnlyCompleteDateTimeString = _self && _self.setup && _self.setup.parseOnlyCompleteDateTimeObjects;
-
     var reviver = parseUtilities.getReviver(parseOnlyCompleteDateTimeString);
 
     Request.parsers = {
         simple: {
             result: parseUtilities.parseResult.bind(null, reviver),
-            error: parseUtilities.parseError.bind(null, reviver)
+            error: parseUtilities.parseXhrError.bind(null, reviver)
         },
         single: {
             result: parseUtilities.parseSingleResult.bind(null, reviver),
-            error: parseUtilities.parseError.bind(null, reviver)
+            error: parseUtilities.parseXhrError.bind(null, reviver)
         },
         update: {
             result: parseUtilities.parseUpdateResult.bind(null, reviver),
-            error: parseUtilities.parseError.bind(null, reviver)
+            error: parseUtilities.parseXhrError.bind(null, reviver)
+        },
+        customRequest: {
+            result: function (response, headers) {
+                if (_.isString(response) && headers && headers[constants.Headers.ContentType] && headers[constants.Headers.ContentType].indexOf('json') > -1) {
+                    return utils.parseUtilities.parseJSON(response, reviver);
+                }
+
+                return response;
+            },
+            error: parseUtilities.parseXhrResponse
         }
     };
 
     if (typeof Request.sendRequest === 'undefined') {
         Request.sendRequest = function (request) {
-            var url = request.buildUrl(request.setup) + request.endpoint;
+            var url = request.buildUrl();
             url = utils.disableRequestCache(url, request.method);
-            request.method = request.method || 'GET';
-            var data = request.method === 'GET' ? request.data : JSON.stringify(request.data);
+            request.method = request.method || constants.HttpMethod.GET;
+            var data = request.method === constants.HttpMethod.GET ? request.data : JSON.stringify(request.data);
+            request.headers['Accept'] = '*/*'; // Reqwest is case sensitive regarding this header name
 
             var requestParams = {
                 url: url,
@@ -16241,14 +16328,13 @@ module.exports = (function () {
 
             if (isNodejs) {
                 requestParams.success = function (data, response) {
-                    request.success.call(request, request.parse.result(data), response);
+                    request.success.call(request, request.parse.result(data, response.headers), response);
                 };
 
                 requestParams.error = function (jqXHR) {
-                    request.error.call(request, request.parse.error(jqXHR.responseText || jqXHR.statusText));
+                    request.error.call(request, request.parse.error(jqXHR));
                 };
             } else {
-                requestParams.type = 'json';
                 requestParams.crossOrigin = true;
                 requestParams.success = function (data, textStatus, jqXHR) {
                     var result = request.parse.result(data);
@@ -16256,7 +16342,7 @@ module.exports = (function () {
                 };
 
                 requestParams.error = function (jqXHR, textStatus, errorThrown) {
-                    var error = request.parse.error(jqXHR.responseText || jqXHR.statusText);
+                    var error = request.parse.error(jqXHR) || textStatus;
                     request.error.call(request, error);
                 };
             }
@@ -16267,7 +16353,7 @@ module.exports = (function () {
 
     return Request;
 }());
-},{"./common":59,"./constants":60,"./everlive.platform":62,"./query/AggregateQuery":86,"./query/Query":89,"./utils":102}],54:[function(require,module,exports){
+},{"./common":60,"./constants":61,"./everlive.platform":63,"./query/AggregateQuery":87,"./query/Query":90,"./utils":103}],54:[function(require,module,exports){
 var _ = require('./common')._;
 var constants = require('./constants');
 var AuthenticationSetup = require('./auth/AuthenticationSetup');
@@ -16318,7 +16404,7 @@ module.exports = (function () {
     return Setup;
 
 }());
-},{"./auth/AuthenticationSetup":56,"./common":59,"./constants":60}],55:[function(require,module,exports){
+},{"./auth/AuthenticationSetup":56,"./common":60,"./constants":61}],55:[function(require,module,exports){
 'use strict';
 var utils = require('../utils');
 var DataQuery = require('../query/DataQuery');
@@ -16760,7 +16846,7 @@ module.exports = (function () {
     return Authentication;
 }());
 
-},{"../Everlive":47,"../EverliveError":48,"../Request":53,"../constants":60,"../query/DataQuery":87,"../storages/LocalStore":96,"../utils":102}],56:[function(require,module,exports){
+},{"../Everlive":47,"../EverliveError":48,"../Request":53,"../constants":61,"../query/DataQuery":88,"../storages/LocalStore":97,"../utils":103}],56:[function(require,module,exports){
 'use strict';
 module.exports = (function () {
     var AuthenticationSetup = function (everlive, options) {
@@ -16772,6 +16858,141 @@ module.exports = (function () {
     return AuthenticationSetup;
 }());
 },{}],57:[function(require,module,exports){
+var path = require('path');
+var Request = require('../Request');
+var constants = require('../constants');
+var _ = require('../common')._;
+var buildPromise = require('../utils').buildPromise;
+var Errors = require('../EverliveError');
+var EverliveError = Errors.EverliveError;
+var EverliveErrors = Errors.EverliveErrors;
+var utils = require('../utils');
+
+function _isValidFuncName (name) {
+    return _.isString(name) && name !== '';
+}
+
+/**
+ * @class BusinessLogic
+ * @classdesc A class for invoking your app's Business Logic such as Cloud Functions and Stored Procedures.
+ * @protected
+ * @param setup {Object} Everlive setup object.
+ */
+function BusinessLogic (setup) {
+    this.setup = setup;
+}
+
+BusinessLogic.prototype._invokeFunction = function (params) {
+    var self = this;
+
+    params = _.extend({
+        authHeaders: true,
+        headers: {}
+    }, params);
+
+    params.isCustomRequest = true;
+    params.method = params.method.toUpperCase();
+
+    if (params.customParameters) {
+        params.headers[constants.Headers.customParameters] = JSON.stringify(params.customParameters);
+    }
+
+    return buildPromise(function (onSuccess, onError) {
+        var req = new Request(self.setup, params);
+        req.success = onSuccess;
+        req.error = onError;
+        req.send();
+    }, params.success, params.error);
+};
+
+/**
+ * Invokes a Cloud Function from the app's Business Logic layer.
+ * @method invokeCloudFunction
+ * @memberOf BusinessLogic.prototype
+ * @param {String} funcName The name of the function to invoke.
+ * @param {Object} params An object containing all invocation request parameters.
+ * @param {HttpMethod} [params.method=GET] HTTP request method.
+ * @param {Object} [params.queryStringParams] Parameters to be passed in the query string.
+ * @param {Object} [params.data] Data to be sent with the request.
+ * @param {Boolean} [params.authHeaders=true] Whether to send the credentials of the currently logged-in user.
+ * @param {Object} [params.headers] Additional headers to be sent with the request.
+ * @param {Object} [params.customParameters] Custom parameters to be sent with the request. They will be accessible in the Cloud Function code.
+ * @returns {Promise} A promise resolved on successful response and rejected on error response.
+ */
+/**
+ * Invokes a Cloud Function from the app's Business Logic layer.
+ * @method invokeCloudFunction
+ * @memberOf BusinessLogic.prototype
+ * @param {String} funcName The name of the function to invoke.
+ * @param {Object} params An object containing all invocation request parameters.
+ * @param {HttpMethod} [params.method=GET] HTTP request method.
+ * @param {Object} [params.queryStringParams] Parameters to be passed in the query string.
+ * @param {Object} [params.data] Data to be sent with the request.
+ * @param {Boolean} [params.authHeaders=true] Whether to send the credentials of the currently logged-in user.
+ * @param {Object} [params.headers] Additional headers to be sent with the request.
+ * @param {Object} [params.customParameters] Custom parameters to be sent with the request. They will be accessible in the Cloud Function code.
+ * @param {Function} success Success callback function.
+ * @param {Function} error Error callback function.
+ */
+BusinessLogic.prototype.invokeCloudFunction = function (funcName, params, success, error) {
+    var err;
+
+    if (!_isValidFuncName(funcName)) {
+        err = new EverliveError(EverliveErrors.invalidOrMissingFunctionName);
+        return utils.callbackAndPromiseErrorResponse(err, error);
+    }
+
+    params = _.extend({
+        method: constants.HttpMethod.GET,
+        success: success,
+        error: error
+    }, params);
+
+    if (params.method.toUpperCase() === constants.HttpMethod.GET && _.size(params.data)) {
+        err = new EverliveError(EverliveErrors.bodyWithGetRequestNotSupported);
+        return utils.callbackAndPromiseErrorResponse(err, error);
+    }
+
+    params.endpoint = path.join(constants.cloudFuncsEndpoint, funcName);
+    return this._invokeFunction(params);
+};
+
+/**
+ * Invokes a Stored Procedure from the app's Business Logic layer.
+ * @method invokeStoredProcedure
+ * @memberOf BusinessLogic.prototype
+ * @param {String} funcName The name of the Stored Procedure to invoke.
+ * @param {Object} funcParams Parameters to be passed to the Stored Procedure.
+ * @returns {Promise} A promise resolved on successful response and rejected on error response.
+ */
+/**
+ * Invokes a Stored Procedure from the app's Business Logic layer.
+ * @method invokeStoredProcedure
+ * @memberOf BusinessLogic.prototype
+ * @param {String} funcName The name of the stored procedure to invoke.
+ * @param {Object} funcParams Parameters to be passed to the Stored Procedure.
+ * @param {Function} success Success callback function.
+ * @param {Function} error Error callback function.
+ */
+BusinessLogic.prototype.invokeStoredProcedure = function (funcName, funcParams, success, error) {
+    if (!_isValidFuncName(funcName)) {
+        var err = new EverliveError(EverliveErrors.invalidOrMissingProcedureName);
+        return utils.callbackAndPromiseErrorResponse(err, error);
+    }
+
+    var reqParams = {
+        method: constants.HttpMethod.POST,
+        endpoint: path.join(constants.sqlProceduresEndpoint, funcName),
+        data: funcParams || {},
+        success: success,
+        error: error
+    };
+
+    return this._invokeFunction(reqParams);
+};
+
+module.exports = BusinessLogic;
+},{"../EverliveError":48,"../Request":53,"../common":60,"../constants":61,"../utils":103,"path":3}],58:[function(require,module,exports){
 'use strict';
 
 var constants = require('../constants');
@@ -16896,8 +17117,9 @@ CacheModule.prototype = {
         var ignoreCacheForQuery = dataQuery.ignoreCache;
 
         var isUnsupportedOffline = this.isQueryUnsupportedOffline(dataQuery);
+        var isForCurrentUser = dataQuery.additionalOptions && dataQuery.additionalOptions.id === 'me';
 
-        return operationShouldSkipCache || cacheDisabledForContentType || ignoreCacheForQuery || isUnsupportedOffline;
+        return operationShouldSkipCache || cacheDisabledForContentType || isForCurrentUser || ignoreCacheForQuery || isUnsupportedOffline;
     },
 
     _cacheDataQuery: function (dataQuery) {
@@ -17107,7 +17329,7 @@ CacheModule.prototype = {
 };
 
 module.exports = CacheModule;
-},{"../EverliveError":48,"../common":59,"../constants":60,"../offline/offline":77,"../offline/offlinePersisters":78,"../query/DataQuery":87,"../query/Query":89,"../utils":102,"underscore":35}],58:[function(require,module,exports){
+},{"../EverliveError":48,"../common":60,"../constants":61,"../offline/offline":78,"../offline/offlinePersisters":79,"../query/DataQuery":88,"../query/Query":90,"../utils":103,"underscore":35}],59:[function(require,module,exports){
 'use strict';
 
 var CacheModule = require('./CacheModule');
@@ -17144,7 +17366,7 @@ module.exports = {
         this.cache._initStore(options);
     }
 };
-},{"../common":59,"./CacheModule":57}],59:[function(require,module,exports){
+},{"../common":60,"./CacheModule":58}],60:[function(require,module,exports){
 (function (global){
 module.exports = (function () {
     var common = {};
@@ -17219,7 +17441,7 @@ module.exports = (function () {
 }());
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 
-},{"../scripts/bs-aggregation-translator":36,"../scripts/bs-expand-processor":40,"./everlive.platform":62,"./reqwest.nativescript":93,"./reqwest.nodejs":94,"json-stable-stringify":7,"jstimezonedetect":11,"mingo":12,"mongo-query":14,"reqwest":33,"rsvp":34,"underscore":35}],60:[function(require,module,exports){
+},{"../scripts/bs-aggregation-translator":36,"../scripts/bs-expand-processor":40,"./everlive.platform":63,"./reqwest.nativescript":94,"./reqwest.nodejs":95,"json-stable-stringify":7,"jstimezonedetect":11,"mingo":12,"mongo-query":14,"reqwest":33,"rsvp":34,"underscore":35}],61:[function(require,module,exports){
 /**
  * Constants used by the SDK* @typedef {Object} Everlive.Constants
  */
@@ -17227,6 +17449,8 @@ module.exports = (function () {
 var constants = {
     idField: 'Id',
     guidEmpty: '00000000-0000-0000-0000-000000000000',
+    cloudFuncsEndpoint: 'Functions',
+    sqlProceduresEndpoint: 'Invoke/SqlProcedures',
     everliveUrl: '//api.everlive.com/v1/',
     /**
      * A class used to represent the conflict resolution strategies.
@@ -17274,6 +17498,8 @@ var constants = {
 
     // The headers used by the Everlive services
     Headers: {
+        ContentType: 'content-type',
+
         filter: 'x-everlive-filter',
         select: 'x-everlive-fields',
         sort: 'x-everlive-sort',
@@ -17465,7 +17691,7 @@ constants.EncodableHeaders = [
 
 module.exports = constants;
 
-},{}],61:[function(require,module,exports){
+},{}],62:[function(require,module,exports){
 var CryptoJS = require('node-cryptojs-aes').CryptoJS;
 var AES = CryptoJS.AES;
 
@@ -17503,7 +17729,7 @@ module.exports = (function () {
 
     return CryptographicProvider;
 }());
-},{"node-cryptojs-aes":25}],62:[function(require,module,exports){
+},{"node-cryptojs-aes":25}],63:[function(require,module,exports){
 var isNativeScript = Boolean(((typeof android !== 'undefined' && android && android.widget && android.widget.Button)
 || (typeof UIButton !== 'undefined' && UIButton)));
 
@@ -17547,7 +17773,7 @@ module.exports = {
     platform: platform,
     isInAppBuilderSimulator: isInAppBuilderSimulator
 };
-},{}],63:[function(require,module,exports){
+},{}],64:[function(require,module,exports){
 'use strict';
 
 /**
@@ -17569,7 +17795,7 @@ if (platform.isCordova || platform.isDesktop) {
 }
 
 module.exports = helpers;
-},{"../everlive.platform":62,"./html/htmlHelper":64}],64:[function(require,module,exports){
+},{"../everlive.platform":63,"./html/htmlHelper":65}],65:[function(require,module,exports){
 'use strict';
 
 var platform = require('../../everlive.platform');
@@ -17597,6 +17823,9 @@ module.exports = (function () {
             fileSource: 'data-href',
             enableOffline: 'data-offline',
             enableResponsive: 'data-responsive'
+        },
+        responsiveParams: {
+            //http://docs.telerik.com/platform/backend-services/javascript/responsive-images/responsive-images-parameters
         }
     };
 
@@ -17618,6 +17847,7 @@ module.exports = (function () {
 
         this.options = _.extend({}, defaults, config);
         this.options.attributes = _.extend({}, defaults.attributes, config.attributes);
+        this.options.responsiveParams = _.extend({}, defaults.responsiveParams, config.responsiveParams);
 
         this._responsive = new HtmlHelperResponsiveModule(this);
         this._offline = new HtmlHelperOfflineModule(this);
@@ -17955,7 +18185,7 @@ module.exports = (function () {
     return HtmlHelper;
 }());
 
-},{"../../EventEmitterProxy":46,"../../EverliveError":48,"../../common":59,"../../constants":60,"../../everlive.platform":62,"../../utils":102,"./htmlHelperOfflineModule":65,"./htmlHelperResponsiveModule":66}],65:[function(require,module,exports){
+},{"../../EventEmitterProxy":46,"../../EverliveError":48,"../../common":60,"../../constants":61,"../../everlive.platform":63,"../../utils":103,"./htmlHelperOfflineModule":66,"./htmlHelperResponsiveModule":67}],66:[function(require,module,exports){
 'use strict';
 
 var utils = require('../../utils');
@@ -18013,7 +18243,7 @@ module.exports = (function () {
 
     return HtmlHelperOfflineModule;
 }());
-},{"../../EverliveError":48,"../../common":59,"../../constants":60,"../../utils":102,"path":3}],66:[function(require,module,exports){
+},{"../../EverliveError":48,"../../common":60,"../../constants":61,"../../utils":103,"path":3}],67:[function(require,module,exports){
 'use strict';
 
 var common = require('../../common');
@@ -18022,6 +18252,13 @@ var rsvp = common.rsvp;
 var EverliveError = require('../../EverliveError').EverliveError;
 var constants = require('../../constants');
 var utils = require('../../utils');
+
+var DEFAULT_RESPONSIVE_OPERATIONS = {
+    params: {
+        resize: {}
+    },
+    isUserResize: false
+};
 
 module.exports = (function () {
     function HtmlHelperResponsiveModule(htmlHelper) {
@@ -18033,52 +18270,76 @@ module.exports = (function () {
             return Math.ceil(el.offsetWidth);
         },
 
+        getBackgroundHeight: function (el) {
+            return Math.ceil(el.offsetHeight);
+        },
+
         parseParamsString: function parseParamsString(str) {
             if (!str || typeof str === 'undefined' || str.length <= 1) {
-                return false;
+                return DEFAULT_RESPONSIVE_OPERATIONS;
             }
 
+            var params = str.split('/');
+
+            var result = {};
             var isUserResize = false;
-            var params = [];
-            var tmp = str.split('/');
-            var ii = tmp.length;
 
-            for (var i = 0; i < ii; i++) {
-                var item = tmp[i].split('='),
-                    tmpObj = {};
-                if (typeof item[1] === 'undefined') {
-                    item[1] = false;
-                } else {
-                    item[1] = unescape(item[1].replace(/\+/g, ' '));
-                }
+            //TODO: Perhaps the conversion from query string to object and vice versa could go in utils, since it may be useful in other places?
+            _.chain(params)
+                .filter(function (param) {
+                    return !!param;
+                }) //TODO: I think there's a function in lodash called "compact", which does this.
+                .each(function (param) {
+                    var paramPair = param.split('=');
+                    var paramName = paramPair[0];
+                    var paramValues = paramPair[1];
+                    paramValues = unescape(paramValues.replace(/\+/g, ' '));
+                    result[paramName] = paramValues;
 
-                tmpObj[item[0]] = item[1];
-                params.push(tmpObj);
-                if (item[0] === 'resize') {
-                    isUserResize = true;
-                }
-            }
+                    if (paramName === 'resize') {
+                        isUserResize = true;
+                    }
+                });
+
             return {
-                params: params,
+                params: result,
                 isUserResize: isUserResize
             };
         },
 
-        getImgParams: function getImgParams(src) {
+        getImgParams: function getImgParams(src, el) {
+            var self = this;
+
             var operations;
             var imgUrl = src.replace(/.*?resize=[^//]*\//gi, '');
             var protocolRe = new RegExp('https?://', 'gi');
             var serverRe = new RegExp(this.htmlHelper._settings.server, 'gi');
             var apiIdRe = new RegExp(this.htmlHelper._everlive.appId + '/', 'gi');
 
-            operations = src.replace(imgUrl, '').replace(protocolRe, '').replace(serverRe, '').replace(apiIdRe, '').toLowerCase();
-            if (operations !== '') {
-                operations = operations.indexOf('/') ? operations.substring(0, operations.length - 1) : operations;
+            var operationsRaw = src.replace(imgUrl, '').replace(protocolRe, '').replace(serverRe, '').replace(apiIdRe, '').toLowerCase();
+            if (operationsRaw !== '') {
+                var operationsToParse = operationsRaw.indexOf('/') ? operationsRaw.substring(0, operationsRaw.length - 1) : operationsRaw;
+                //TODO: I'm hazy on the context, but... If operationsToParse starts with "/", we parse it "as is",
+                //if not, I guess it's expected to have it in the end and it's truncated? Is it
+                //impossible to not have a "/" at all and cut the last symbol when maybe it shouldn't be cut?
+                operations = this.parseParamsString(operationsToParse);
+            } else if (el.dataset.responsiveParams) {
+                operations = DEFAULT_RESPONSIVE_OPERATIONS;
+                _.each(el.dataset.responsiveParams.split(','), function (key) {
+                    var pair = key.split(':');
+                    var param = pair[0];
+                    var value = pair[1];
+                    operations.params.resize[param] = value;
+                });
             } else {
-                operations = false;
+                operations = DEFAULT_RESPONSIVE_OPERATIONS;
             }
 
-            operations = this.parseParamsString(operations);
+            _.chain(this.htmlHelper.options.responsiveParams).keys().each(function (key) {
+                var value = self.htmlHelper.options.responsiveParams[key];
+                operations.params.resize[key] = value;
+            });
+
             // If it's a user resize operation, use the passed url in the data-src property
             if (operations.isUserResize) {
                 imgUrl = src;
@@ -18098,14 +18359,34 @@ module.exports = (function () {
 
         getImageWidth: function getImageWidth(el) {
             var parentEl = el.parentNode;
-            var parentWidth = parentEl.offsetWidth;
-            var itemStyle = window.getComputedStyle(parentEl, null);
-            var pl = parseFloat(itemStyle.getPropertyValue('padding-left'));
-            var pr = parseFloat(itemStyle.getPropertyValue('padding-right'));
-            var bl = parseFloat(itemStyle.getPropertyValue('border-left-width'));
-            var br = parseFloat(itemStyle.getPropertyValue('border-right-width'));
+            if (parentEl) {
+                var parentWidth = parentEl.offsetWidth;
+                var itemStyle = window.getComputedStyle(parentEl, null);
+                var pl = parseFloat(itemStyle.getPropertyValue('padding-left'));
+                var pr = parseFloat(itemStyle.getPropertyValue('padding-right'));
+                var bl = parseFloat(itemStyle.getPropertyValue('border-left-width'));
+                var br = parseFloat(itemStyle.getPropertyValue('border-right-width'));
 
-            return Math.abs(parentWidth - Math.ceil(pl + pr + bl + br));
+                return Math.abs(parentWidth - Math.ceil(pl + pr + bl + br));
+            }
+
+            return 0;
+        },
+
+        getImageHeight: function (el) {
+            var parentEl = el.parentNode;
+            if (parentEl) {
+                var parentHeight = parentEl.offsetHeight;
+                var itemStyle = window.getComputedStyle(parentEl, null);
+                var pt = parseFloat(itemStyle.getPropertyValue('padding-top'));
+                var pb = parseFloat(itemStyle.getPropertyValue('padding-bottom'));
+                var bt = parseFloat(itemStyle.getPropertyValue('border-top-width'));
+                var bb = parseFloat(itemStyle.getPropertyValue('border-bottom-width'));
+
+                return Math.abs(parentHeight - Math.ceil(pt + pb + bt + bb));
+            }
+
+            return 0;
         },
 
         getDevicePixelRatio: function getDevicePixelRatio() {
@@ -18117,27 +18398,17 @@ module.exports = (function () {
             return pixelDensity !== '' ? _.isNumber(pixelDensity) ? parseFloat(pixelDensity) : false : this.getDevicePixelRatio();
         },
 
-        getImgParamsString: function getImgParamsString(image, params) {
-            var paramsStr = '';
-            var i = 0;
-            var ii = params.length;
-            for (; i < ii; i++) {
-                var item = params[i];
-                var key = _.keys(item)[0];
-                var value;
+        getImgParamsString: function getImgParamsString(params) {
+            var paramsStr = 'resize=';
 
-                if (!utils.isElement.image(image) && key === 'resize') {
-                    continue;
+            _.chain(params.resize).keys().each(function (paramName, index, arr) {
+                paramsStr += (paramName + ':' + params.resize[paramName]);
+                if (index < arr.length - 1) {
+                    paramsStr += ',';
+                } else {
+                    paramsStr += '/';
                 }
-
-                var pixelDensity = this.getPixelRatio(image.item);
-                pixelDensity = (pixelDensity) ? ',pd:' + pixelDensity : '';
-                for (var k in item) {
-                    value = (key === 'resize') ? item[k] + pixelDensity : item[k];
-                }
-
-                paramsStr += key + '=' + value + '/';
-            }
+            });
 
             return paramsStr;
         },
@@ -18151,10 +18422,10 @@ module.exports = (function () {
             var isImage = utils.isElement.image(tag);
             var imgWidth;
 
-            image = _.extend({}, image, self.getImgParams(dataSrc));
+            image = _.extend({}, image, self.getImgParams(dataSrc, item.item));
 
             if (!image.isUserResize) {
-                imgWidth = (!isImage) ? self.getBackgroundWidth(element) : self.getImageWidth(element);
+                imgWidth = isImage ? self.getImageWidth(element) : self.getBackgroundWidth(element);
             }
 
             imgWidth = imgWidth ? imgWidth : false;
@@ -18178,26 +18449,35 @@ module.exports = (function () {
             var url = this.htmlHelper._settings.urlTemplate;
             var pixelDensity = this.getPixelRatio(image.item);
 
-            pixelDensity = pixelDensity ? ',pd:' + pixelDensity : '';
-
             url = url.replace('[protocol]', protocol);
-            url = url.replace('[appid]', appId ? appId : '');
+            url = url.replace('[appid]', appId || '');
             url = url.replace('[hostname]', server);
 
             var params = image.operations || false;
+            var paramsString;
             if (params) {
                 var operations = '';
-                params = this.getImgParamsString(image, params);
-                if (utils.isElement.image(image.tag)) {
-                    operations = imgWidth ? 'resize=w:' + imgWidth + pixelDensity + '/' + params : params;
-                } else {
-                    operations = 'resize=w:' + imgWidth + pixelDensity + '/' + params;
+                params.resize = params.resize || {};
+                params.resize.w = imgWidth;
+                params.resize.pd = pixelDensity;
+                var fill = params.resize.fill;
+                if (fill === 'cover' || fill === 'contain') {
+                    //for fill:cover, we need both the width and height of the image
+                    params.resize.h = this.getImageHeight(image.item) || this.getBackgroundHeight(image.item);
                 }
-                url = url.replace('[operations]', operations);
+
+                paramsString = this.getImgParamsString(params);
             } else {
-                url = url.replace('[operations]', 'resize=w:' + imgWidth + pixelDensity + '/');
+                var defaultParams = {
+                    resize: {
+                        w: imgWidth,
+                        pd: pixelDensity
+                    }
+                };
+                paramsString = this.getImgParamsString(defaultParams);
             }
 
+            url = url.replace('[operations]', paramsString);
             url = url.replace('[url]', image.imgUrl);
             return url;
         }
@@ -18205,33 +18485,11 @@ module.exports = (function () {
 
     return HtmlHelperResponsiveModule;
 }());
-},{"../../EverliveError":48,"../../common":59,"../../constants":60,"../../utils":102}],67:[function(require,module,exports){
-/*!
- The MIT License (MIT)
- Copyright (c) 2013 Telerik AD
- Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated documentation files (the "Software"), to deal
- in the Software without restriction, including without limitation the rights
- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- copies of the Software, and to permit persons to whom the Software is
- furnished to do so, subject to the following conditions:
- The above copyright notice and this permission notice shall be included in
- all copies or substantial portions of the Software.
- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- THE SOFTWARE.y distributed under the MIT license.
- */
-/*!
- Everlive SDK
- Version 1.6.7
- */
+
+},{"../../EverliveError":48,"../../common":60,"../../constants":61,"../../utils":103}],68:[function(require,module,exports){
 (function () {
     var Everlive = require('./Everlive');
-    Everlive.version = '1.6.7';
+    Everlive.version = '1.6.11';
 
     var platform = require('./everlive.platform');
 
@@ -18251,6 +18509,7 @@ module.exports = (function () {
     Everlive.GeoPoint = require('./GeoPoint');
     Everlive.Constants = require('./constants');
     Everlive.Request = require('./Request');
+    Everlive.EverliveErrors = require('./EverliveError').EverliveErrors;
     Everlive.Data = require('./types/Data');
     Everlive._utils = require('./utils');
     Everlive._traverseAndRevive = Everlive._utils.parseUtilities.traverseAndRevive;
@@ -18265,7 +18524,7 @@ module.exports = (function () {
     module.exports = Everlive;
 }());
 
-},{"./Everlive":47,"./GeoPoint":51,"./Request":53,"./common":59,"./constants":60,"./everlive.platform":62,"./kendo/kendo.everlive":68,"./offline/offlinePersisters":78,"./query/AggregateQuery":86,"./query/Query":89,"./query/QueryBuilder":90,"./types/Data":99,"./utils":102}],68:[function(require,module,exports){
+},{"./Everlive":47,"./EverliveError":48,"./GeoPoint":51,"./Request":53,"./common":60,"./constants":61,"./everlive.platform":63,"./kendo/kendo.everlive":69,"./offline/offlinePersisters":79,"./query/AggregateQuery":87,"./query/Query":90,"./query/QueryBuilder":91,"./types/Data":100,"./utils":103}],69:[function(require,module,exports){
 var QueryBuilder = require('../query/QueryBuilder');
 var Query = require('../query/Query');
 var AggregateQuery = require('../query/AggregateQuery');
@@ -18867,7 +19126,7 @@ var operations = {
     };
 }());
 
-},{"../Everlive":47,"../EverliveError":48,"../Request":53,"../common":59,"../constants":60,"../query/AggregateQuery":86,"../query/Query":89,"../query/QueryBuilder":90}],69:[function(require,module,exports){
+},{"../Everlive":47,"../EverliveError":48,"../Request":53,"../common":60,"../constants":61,"../query/AggregateQuery":87,"../query/Query":90,"../query/QueryBuilder":91}],70:[function(require,module,exports){
 var _ = require('../common')._;
 
 var deepExtend = require('./underscoreDeepExtend');
@@ -18877,7 +19136,7 @@ var isObjectEmpty = require('./underscoreIsObjectEmpty');
 _.mixin({'deepExtend': deepExtend});
 _.mixin({'compactObject': compactObject});
 _.mixin({'isEmptyObject': isObjectEmpty});
-},{"../common":59,"./underscoreCompactObject":70,"./underscoreDeepExtend":71,"./underscoreIsObjectEmpty":72}],70:[function(require,module,exports){
+},{"../common":60,"./underscoreCompactObject":71,"./underscoreDeepExtend":72,"./underscoreIsObjectEmpty":73}],71:[function(require,module,exports){
 var _ = require('underscore');
 
 //http://stackoverflow.com/questions/14058193/remove-empty-properties-falsy-values-from-object-with-underscore-js
@@ -18892,7 +19151,7 @@ module.exports = function compactObject(o) {
     return newObject;
 };
 
-},{"underscore":35}],71:[function(require,module,exports){
+},{"underscore":35}],72:[function(require,module,exports){
 /*  Copyright (C) 2012-2014  Kurt Milam - http://xioup.com | Source: https://gist.github.com/1868955
  *   
  *  Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
@@ -18994,7 +19253,7 @@ module.exports = function deepExtend(obj) {
  *   output: [1, 3, 4]
  *
  **/
-},{"../common":59}],72:[function(require,module,exports){
+},{"../common":60}],73:[function(require,module,exports){
 // http://stackoverflow.com/questions/4994201/is-object-empty
 'use strict';
 
@@ -19021,7 +19280,7 @@ function isEmpty(obj) {
 }
 
 module.exports = isEmpty;
-},{}],73:[function(require,module,exports){
+},{}],74:[function(require,module,exports){
 'use strict';
 
 var utils = require('../utils');
@@ -19471,7 +19730,7 @@ OfflineFilesModule.prototype = {
 };
 
 module.exports = OfflineFilesModule;
-},{"../AutoQueue":45,"../EverliveError":48,"../Request":53,"../common":59,"../utils":102,"node-cryptojs-aes":25,"path":3}],74:[function(require,module,exports){
+},{"../AutoQueue":45,"../EverliveError":48,"../Request":53,"../common":60,"../utils":103,"node-cryptojs-aes":25,"path":3}],75:[function(require,module,exports){
 'use strict';
 
 var EverliveErrorModule = require('../EverliveError');
@@ -19688,7 +19947,7 @@ OfflineFilesProcessor.prototype = {
 };
 
 module.exports = OfflineFilesProcessor;
-},{"../EverliveError":48,"../common":59,"../constants":60,"../everlive.platform":62,"../storages/FileStore":95,"../utils":102,"path":3}],75:[function(require,module,exports){
+},{"../EverliveError":48,"../common":60,"../constants":61,"../everlive.platform":63,"../storages/FileStore":96,"../utils":103,"path":3}],76:[function(require,module,exports){
 'use strict';
 
 var DataQuery = require('../query/DataQuery');
@@ -20589,7 +20848,7 @@ OfflineQueryProcessor.prototype = {
 };
 
 module.exports = OfflineQueryProcessor;
-},{"../EverliveError":48,"../ExpandProcessor":49,"../common":59,"../constants":60,"../everlive.platform":62,"../query/DataQuery":87,"../query/Query":89,"../utils":102,"./offlineTransformations":79,"path":3}],76:[function(require,module,exports){
+},{"../EverliveError":48,"../ExpandProcessor":49,"../common":60,"../constants":61,"../everlive.platform":63,"../query/DataQuery":88,"../query/Query":90,"../utils":103,"./offlineTransformations":80,"path":3}],77:[function(require,module,exports){
 var DataQuery = require('../query/DataQuery');
 var everliveErrorModule = require('../EverliveError');
 var EverliveError = everliveErrorModule.EverliveError;
@@ -21121,6 +21380,9 @@ module.exports = (function() {
                     }
                 })
                 .catch(function(err) {
+                    if (!err) {
+                        err = new EverliveError(EverliveErrors.syncErrorUnknown);
+                    }
                     self._syncResultInfo.error = err;
                     self._fireSyncEnd();
                 });
@@ -21570,6 +21832,9 @@ module.exports = (function() {
 
             var getFailedItem = function(id) {
                 var pickedObject = _.pick(results, 'storage', 'type', 'error');
+                if (!pickedObject.error) {
+                    pickedObject.error = new EverliveError(EverliveErrors.syncErrorUnknown);
+                }
                 return _.extend({
                     itemId: id,
                     contentType: targetType
@@ -22200,7 +22465,7 @@ module.exports = (function() {
 
     return OfflineModule;
 })();
-},{"../EverliveError":48,"../Request":53,"../common":59,"../constants":60,"../query/DataQuery":87,"../query/Query":89,"../query/RequestOptionsBuilder":91,"../utils":102,"./OfflineFilesModule":73,"./OfflineFilesProcessor":74,"./OfflineQueryProcessor":75,"./offlineTransformations":79,"path":3}],77:[function(require,module,exports){
+},{"../EverliveError":48,"../Request":53,"../common":60,"../constants":61,"../query/DataQuery":88,"../query/Query":90,"../query/RequestOptionsBuilder":92,"../utils":103,"./OfflineFilesModule":74,"./OfflineFilesProcessor":75,"./OfflineQueryProcessor":76,"./offlineTransformations":80,"path":3}],78:[function(require,module,exports){
 var constants = require('../constants');
 var persisters = require('./offlinePersisters');
 var LocalStoragePersister = persisters.LocalStoragePersister;
@@ -22326,7 +22591,7 @@ module.exports = (function () {
         buildOfflineStorageOptions: buildOfflineStorageOptions
     }
 }());
-},{"../EverliveError":48,"../common":59,"../constants":60,"../encryption/CryptographicProvider":61,"../everlive.platform":62,"./OfflineStorageModule":76,"./offlinePersisters":78}],78:[function(require,module,exports){
+},{"../EverliveError":48,"../common":60,"../constants":61,"../encryption/CryptographicProvider":62,"../everlive.platform":63,"./OfflineStorageModule":77,"./offlinePersisters":79}],79:[function(require,module,exports){
 var BasePersister = require('./persisters/BasePersister');
 var LocalStoragePersister = require('./persisters/LocalStoragePersister');
 var FileSystemPersister = require('./persisters/FileSystemPersister');
@@ -22363,7 +22628,7 @@ module.exports = {
         return persister;
     }
 };
-},{"../EverliveError":48,"../common":59,"../constants":60,"./persisters/BasePersister":80,"./persisters/FileSystemPersister":81,"./persisters/LocalStoragePersister":82}],79:[function(require,module,exports){
+},{"../EverliveError":48,"../common":60,"../constants":61,"./persisters/BasePersister":81,"./persisters/FileSystemPersister":82,"./persisters/LocalStoragePersister":83}],80:[function(require,module,exports){
 'use strict';
 
 var constants = require('../constants');
@@ -22447,7 +22712,7 @@ var offlineTransformations = {
 };
 
 module.exports = offlineTransformations;
-},{"../common":59,"../constants":60}],80:[function(require,module,exports){
+},{"../common":60,"../constants":61}],81:[function(require,module,exports){
 'use strict';
 
 var EverliveError = require('../../EverliveError').EverliveError;
@@ -22557,7 +22822,7 @@ var BasePersister = (function () {
 }());
 
 module.exports = BasePersister;
-},{"../../EverliveError":48,"../../common":59,"../../utils":102}],81:[function(require,module,exports){
+},{"../../EverliveError":48,"../../common":60,"../../utils":103}],82:[function(require,module,exports){
 'use strict';
 
 var FileStore = require('../../storages/FileStore');
@@ -22684,7 +22949,7 @@ var FileSystemPersister = (function () {
 }());
 
 module.exports = FileSystemPersister;
-},{"../../EverliveError":48,"../../common":59,"../../everlive.platform":62,"../../storages/FileStore":95,"../../utils":102,"./BasePersister":80,"path":3,"util":6}],82:[function(require,module,exports){
+},{"../../EverliveError":48,"../../common":60,"../../everlive.platform":63,"../../storages/FileStore":96,"../../utils":103,"./BasePersister":81,"path":3,"util":6}],83:[function(require,module,exports){
 'use strict';
 
 var common = require('../../common');
@@ -22811,7 +23076,7 @@ var LocalStoragePersister = (function () {
 }());
 
 module.exports = LocalStoragePersister;
-},{"../../common":59,"../../storages/LocalStore":96,"./BasePersister":80,"util":6}],83:[function(require,module,exports){
+},{"../../common":60,"../../storages/LocalStore":97,"./BasePersister":81,"util":6}],84:[function(require,module,exports){
 var buildPromise = require('../utils').buildPromise;
 var EverliveError = require('../EverliveError').EverliveError;
 var Platform = require('../constants').Platform;
@@ -23493,7 +23758,7 @@ module.exports = (function () {
     return CurrentDevice;
 }());
 
-},{"../EverliveError":48,"../common":59,"../constants":60,"../utils":102}],84:[function(require,module,exports){
+},{"../EverliveError":48,"../common":60,"../constants":61,"../utils":103}],85:[function(require,module,exports){
 var platform = require('../everlive.platform');
 var _ = require('../common')._;
 
@@ -23508,7 +23773,7 @@ if (platform.isNativeScript) {
 } else {
     module.exports = _.noop;
 }
-},{"../common":59,"../everlive.platform":62,"./CordovaCurrentDevice":83,"./NativeScriptCurrentDevice":85}],85:[function(require,module,exports){
+},{"../common":60,"../everlive.platform":63,"./CordovaCurrentDevice":84,"./NativeScriptCurrentDevice":86}],86:[function(require,module,exports){
 var buildPromise = require('../utils').buildPromise;
 var EverliveError = require('../EverliveError').EverliveError;
 var Platform = require('../constants').Platform;
@@ -24043,7 +24308,7 @@ module.exports = (function () {
     return CurrentDevice;
 }());
 
-},{"../EverliveError":48,"../common":59,"../constants":60,"../utils":102,"platform":"platform"}],86:[function(require,module,exports){
+},{"../EverliveError":48,"../common":60,"../constants":61,"../utils":103,"platform":"platform"}],87:[function(require,module,exports){
 var _ = require('../common')._;
 var Query = require('./Query');
 var util = require('util');
@@ -24166,27 +24431,16 @@ AggregateQuery.prototype.sum = function () {
     return this._aggregateFunc.apply(this, arguments);
 };
 
-AggregateQuery.prototype.select = function () {
-    throw new EverliveError('select() is not supported for aggregations.');
-};
-
-AggregateQuery.prototype.skip = function () {
-    throw new EverliveError('skip() is not supported for aggregations.');
-};
-
-AggregateQuery.prototype.take = function () {
-    throw new EverliveError('take() is not supported for aggregations.');
-};
-
-AggregateQuery.prototype.order = function () {
-    throw new EverliveError('order() is not supported for aggregations.');
-};
+AggregateQuery.prototype.select = undefined;
+AggregateQuery.prototype.skip  = undefined;
+AggregateQuery.prototype.take = undefined;
+AggregateQuery.prototype.order = undefined;
 
 AggregateQuery.prototype.average = AggregateQuery.prototype.avg;
 
 module.exports = AggregateQuery;
 
-},{"../EverliveError":48,"../common":59,"./Query":89,"util":6}],87:[function(require,module,exports){
+},{"../EverliveError":48,"../common":60,"./Query":90,"util":6}],88:[function(require,module,exports){
 var _ = require('../common')._;
 var constants = require('../constants');
 var Query = require('../query/Query');
@@ -24268,7 +24522,7 @@ module.exports = (function () {
             if (this.operation === DataQuery.operations.ReadById) {
                 queryParams.expand = this.getHeaderAsJSON(Headers.expand);
                 queryParams.select = this.getHeaderAsJSON(Headers.select);
-            } else if (!this.additionalOptions || !this.additionalOptions.id) {
+            } else if (!this.additionalOptions || this.additionalOptions.id === undefined) {
                 var sort = this.getHeaderAsJSON(Headers.sort);
                 var limit = this.getHeaderAsJSON(Headers.take);
                 var skip = this.getHeaderAsJSON(Headers.skip);
@@ -24364,13 +24618,90 @@ module.exports = (function () {
 
     return DataQuery;
 }());
-},{"../common":59,"../constants":60,"../query/Query":89,"../utils":102}],88:[function(require,module,exports){
+},{"../common":60,"../constants":61,"../query/Query":90,"../utils":103}],89:[function(require,module,exports){
 'use strict';
 
 var constants = require('../constants');
 
+/**
+ * @class EventQuery
+ * @classdesc A query which is passed in the 'beforeExecute' event of [Everlive]{@link Everlive}. Allows changing the parameters of
+ * a query before executing it.
+ */
 var EventQuery = function () {
 };
+
+/** The name of the content type, e.g. EmailSubcrbers.
+ * @memberOf EventQuery.prototype
+ * @member {string} contentTypeName
+ */
+
+/** The query data which will be send to the server.
+ * @memberOf EventQuery.prototype
+ * @member {Object} data
+ */
+
+/** The query headers which will be send with the HTTP request.
+ * @memberOf EventQuery.prototype
+ * @member {Object} headers
+ */
+
+/** The Id of the item.
+ * @memberOf EventQuery.prototype
+ * @member {string} itemId
+ */
+
+/** The type of the operation--read, write, update, delete.
+ * @memberOf EventQuery.prototype
+ * @member {string} operation
+ */
+
+/** A power fields expression.
+ * @memberOf EventQuery.prototype
+ * @member {string} powerfields
+ * @deprecated
+ */
+
+/** A custom settings object.
+ * @memberOf EventQuery.prototype
+ * @member {string} settings
+ */
+
+/** A [filter expression](http://docs.telerik.com/platform/backend-services/rest/queries/queries-filtering) definition.
+ * @memberOf EventQuery.prototype
+ * @member {Object} filter
+ */
+
+/** A [fields expression](http://docs.telerik.com/platform/backend-services/rest/queries/queries-subset-fields) definition.
+ * @memberOf EventQuery.prototype
+ * @member {Object} fields
+ */
+
+/** A [sort expression](http://docs.telerik.com/platform/backend-services/rest/queries/queries-sorting) definition.
+ * @memberOf EventQuery.prototype
+ * @member {Object} sort
+ */
+
+/** The number of result items to skip. Used for paging.
+ * @memberOf EventQuery.prototype
+ * @member {Number} skip
+ */
+
+/** The number of result items to take. Used for paging.
+ * @memberOf EventQuery.prototype
+ * @member {Number} take
+ */
+
+/** An [expand expression](http://docs.telerik.com/platform/backend-services/javascript/data/relations/relations-defining) definition.
+ * @memberOf EventQuery.prototype
+ * @member {Object} expand
+ */
+
+/** Indicates whether the query is a synchronization query. Used with Offline Support.
+ * @memberOf EventQuery.prototype
+ * @member {boolean} isSync
+ * @readonly
+ */
 
 function applyDataQueryParameters(eventQuery, dataQuery) {
     var queryParameters = dataQuery.getQueryParameters();
@@ -24383,6 +24714,15 @@ function applyDataQueryParameters(eventQuery, dataQuery) {
     eventQuery.aggregate = queryParameters.aggregate;
     return queryParameters;
 }
+
+/** An object allowing to modify the settings of the EventQuery.
+ * @memberOf EventQuery.prototype
+ * @member {Object} settings
+ * @property {boolean} useOffline - Modifies whether the query should be invoked on the offline storage.
+ * @property {boolean} applyOffline - Modifies whether the query should be applied offline if the SDK is currently working online. Default is true. Only valid when offlineStorage is enabled.
+ * @property {boolean} ignoreCache - Does not use the cache when retrieving the data. Only valid when caching is enabled.
+ * @property {boolean} forceCache - Forces the request to get the data from the cache even if the data is already expired. Only valid when caching is enabled.
+ */
 
 function applyDataQuerySettings(eventQuery, dataQuery) {
     eventQuery.settings = {
@@ -24426,6 +24766,19 @@ EventQuery.fromDataQuery = function (dataQuery) {
     return eventQuery;
 };
 
+/**
+ * Cancels the query.
+ * @memberOf EventQuery.prototype
+ * @method cancel
+ */
+
+/**
+ * Indicates whether the query has been canceled.
+ * @memberOf EventQuery.prototype
+ * @method isCanceled
+ * @returns {boolean}
+ */
+
 EventQuery.prototype = {
     cancel: function () {
         this._cancelled = true;
@@ -24436,7 +24789,7 @@ EventQuery.prototype = {
 };
 
 module.exports = EventQuery;
-},{"../constants":60}],89:[function(require,module,exports){
+},{"../constants":61}],90:[function(require,module,exports){
 var Expression = require('../Expression');
 var OperatorType = require('../constants').OperatorType;
 var WhereQuery = require('./WhereQuery');
@@ -24562,7 +24915,7 @@ module.exports = (function () {
 
     return Query;
 }());
-},{"../Expression":50,"../constants":60,"./QueryBuilder":90,"./WhereQuery":92}],90:[function(require,module,exports){
+},{"../Expression":50,"../constants":61,"./QueryBuilder":91,"./WhereQuery":93}],91:[function(require,module,exports){
 var constants = require('../constants');
 var OperatorType = constants.OperatorType;
 var _ = require('../common')._;
@@ -24930,19 +25283,25 @@ module.exports = (function () {
 
     return QueryBuilder;
 }());
-},{"../EverliveError":48,"../Expression":50,"../GeoPoint":51,"../common":59,"../constants":60}],91:[function(require,module,exports){
+},{"../EverliveError":48,"../Expression":50,"../GeoPoint":51,"../common":60,"../constants":61}],92:[function(require,module,exports){
 var DataQuery = require('./DataQuery');
 var Request = require('../Request');
 var _ = require('../common')._;
 var constants = require('../constants');
+var path = require('path');
 
 module.exports = (function () {
     var RequestOptionsBuilder = {};
 
     RequestOptionsBuilder._buildEndpointUrl = function (dataQuery) {
         var endpoint = dataQuery.collectionName;
-        if (dataQuery.additionalOptions && dataQuery.additionalOptions.id !== undefined) {
-            endpoint += '/' + dataQuery.additionalOptions.id;
+        var isQueryById = dataQuery.additionalOptions && dataQuery.additionalOptions.id !== undefined;
+        var queryType = typeof dataQuery.query;
+
+        if (isQueryById) {
+            endpoint = path.join(endpoint, dataQuery.additionalOptions.id.toString());
+        } else if (queryType === 'string' || queryType === 'number') {
+            endpoint = path.join(endpoint, dataQuery.query);
         }
 
         return endpoint;
@@ -24966,7 +25325,13 @@ module.exports = (function () {
     };
 
     RequestOptionsBuilder._build = function (dataQuery, additionalOptions) {
-        return _.extend(RequestOptionsBuilder._buildBaseObject(dataQuery), additionalOptions);
+        var options = _.extend(RequestOptionsBuilder._buildBaseObject(dataQuery), additionalOptions);
+
+        if (additionalOptions.endpointSupplement) {
+            options.endpoint = path.join(options.endpoint, additionalOptions.endpointSupplement);
+        }
+
+        return options;
     };
 
     RequestOptionsBuilder[DataQuery.operations.Read] = function (dataQuery) {
@@ -24995,19 +25360,11 @@ module.exports = (function () {
     };
 
     RequestOptionsBuilder[DataQuery.operations.RawUpdate] = function (dataQuery) {
-        var endpoint = dataQuery.collectionName;
         var query = dataQuery.query;
-        var ofilter = null; // request options filter
-
-        if (typeof query === 'string') {
-            endpoint += '/' + query; // send the filter as string
-        } else if (typeof query === 'object') {
-            ofilter = query; // send the filter as filter headers
-        }
+        var ofilter = typeof query === 'object' ? query : null; // request options filter
 
         return RequestOptionsBuilder._build(dataQuery, {
             method: 'PUT',
-            endpoint: endpoint,
             query: ofilter
         });
     };
@@ -25027,43 +25384,24 @@ module.exports = (function () {
     RequestOptionsBuilder[DataQuery.operations.DeleteById] = RequestOptionsBuilder[DataQuery.operations.Delete];
 
     RequestOptionsBuilder[DataQuery.operations.SetAcl] = function (dataQuery) {
-        var endpoint = dataQuery.collectionName;
-        var query = dataQuery.query;
-
-        if (typeof query === 'string') { // if query is string than will update a single item using the query as an identifier
-            endpoint += '/' + query;
-        } else if (typeof query === 'object') { // else if it is an object than we will use it's id property
-            endpoint += '/' + query[constants.idField];
-        }
-        endpoint += '/_acl';
-        var method, data;
-        if (dataQuery.additionalOptions.acl === null) {
+        var method;
+        if (dataQuery.data === null) {
             method = 'DELETE';
+            dataQuery.data = undefined;
         } else {
             method = 'PUT';
-            data = dataQuery.additionalOptions.acl;
         }
 
         return RequestOptionsBuilder._build(dataQuery, {
             method: method,
-            endpoint: endpoint,
-            data: data
+            endpointSupplement: '/_acl'
         });
     };
 
     RequestOptionsBuilder[DataQuery.operations.SetOwner] = function (dataQuery) {
-        var endpoint = dataQuery.collectionName;
-        var query = dataQuery.query;
-        if (typeof query === 'string') { // if query is string than will update a single item using the query as an identifier
-            endpoint += '/' + query;
-        } else if (typeof query === 'object') { // else if it is an object than we will use it's id property
-            endpoint += '/' + query[constants.idField];
-        }
-        endpoint += '/_owner';
-
         return RequestOptionsBuilder._build(dataQuery, {
             method: 'PUT',
-            endpoint: endpoint
+            endpointSupplement: '/_owner'
         });
     };
 
@@ -25154,7 +25492,7 @@ module.exports = (function () {
 
     return RequestOptionsBuilder;
 }());
-},{"../Request":53,"../common":59,"../constants":60,"./DataQuery":87}],92:[function(require,module,exports){
+},{"../Request":53,"../common":60,"../constants":61,"./DataQuery":88,"path":3}],93:[function(require,module,exports){
 var Expression = require('../Expression');
 var OperatorType = require('../constants').OperatorType;
 
@@ -25450,8 +25788,24 @@ module.exports = (function () {
 
     return WhereQuery;
 }());
-},{"../Expression":50,"../constants":60}],93:[function(require,module,exports){
+},{"../Expression":50,"../constants":61}],94:[function(require,module,exports){
 var http = require('http');
+var constants = require('./constants');
+
+// NodeJS nulls header name casing by lowering all casing,
+// we simulate this in NS with this function to avoid header name issues
+function getCaseInsensitiveHeaders (headers) {
+    var result = {};
+
+    for (var headerName in headers) {
+        if (headers.hasOwnProperty(headerName)) {
+            result[headerName.toLowerCase()] = headers[headerName];
+        }
+    }
+
+    return result;
+}
+
 module.exports = (function () {
     'use strict';
 
@@ -25466,32 +25820,40 @@ module.exports = (function () {
             httpRequestOptions.content = options.data; // NOTE: If we pass null/undefined, it will raise an exception in the http module.
         }
 
-        httpRequestOptions.headers['Accept'] = 'application/json';
-        httpRequestOptions.headers['Content-Type'] = 'application/json';
+        httpRequestOptions.headers[constants.Headers.ContentType] = httpRequestOptions.contentType || 'application/json';
 
-        var noop = function () {
-        };
+        var noop = function () {};
         var success = options.success || noop;
         var error = options.error || noop;
 
         var requestSuccessCallback = function (response) {
             var contentString = response.content.toString();
+            var caseInsensitiveHeaders = getCaseInsensitiveHeaders(response.headers);
+
             if (response.statusCode < 400) {
                 // Success callback calls a custom parse function
-                success(contentString);
+                success(contentString, { headers: caseInsensitiveHeaders });
             } else {
                 // Error callback relies on a JSON Object with ResponseText inside
                 error({
-                    responseText: contentString
+                    responseText: contentString,
+                    getResponseHeader: function (headerName) {
+                        return caseInsensitiveHeaders[headerName.toLowerCase()];
+                    }
                 });
             }
         };
 
         var requestErrorCallback = function (err) {
+            var caseInsensitiveHeaders = getCaseInsensitiveHeaders(err.headers);
+
             // error: function(jqXHR, textStatus, errorThrown)
             // when timeouting for example (i.e. no internet connectivity), we get an err with content { message: "timeout...", stack: null }
             error({
-                responseText: err
+                responseText: err,
+                getResponseHeader: function (headerName) {
+                    return caseInsensitiveHeaders[headerName.toLowerCase()];
+                }
             });
         };
 
@@ -25500,7 +25862,7 @@ module.exports = (function () {
 
     return reqwest;
 }());
-},{"http":"http"}],94:[function(require,module,exports){
+},{"./constants":61,"http":"http"}],95:[function(require,module,exports){
 (function (Buffer){
 var url = require('url');
 var http = require('http');
@@ -25508,6 +25870,7 @@ var https = require('https');
 var rsvp = require('rsvp');
 var zlib = require('zlib');
 var _ = require('underscore');
+var constants = require('./constants');
 
 module.exports = (function () {
     'use strict';
@@ -25525,7 +25888,7 @@ module.exports = (function () {
         options.success = options.success || _.noop;
         options.error = options.error || _.noop;
 
-        headers['Content-Type'] = options.contentType;
+        headers[constants.Headers.ContentType] = options.contentType;
         var req = request({
             method: options.method,
             hostname: urlParts.hostname,
@@ -25557,12 +25920,22 @@ module.exports = (function () {
                     options.success(json, res);
                 } else {
                     if (json) {
-                        options.error({ responseText: json });
+                        options.error({
+                            responseText: json,
+                            getResponseHeader: function (headerName) {
+                                return res.headers[headerName.toLowerCase()];
+                            }
+                        });
                     }
                     else { // empty response
                         var error = new Error('Response error.');
                         error.statusCode = res.statusCode;
-                        options.error({ responseText: error });
+                        options.error({
+                            responseText: error,
+                            getResponseHeader: function (headerName) {
+                                return res.headers[headerName.toLowerCase()];
+                            }
+                        });
                     }
                 }
             });
@@ -25595,7 +25968,7 @@ module.exports = (function () {
 }());
 }).call(this,require("buffer").Buffer)
 
-},{"buffer":"buffer","http":"http","https":"https","rsvp":34,"underscore":35,"url":"url","zlib":"zlib"}],95:[function(require,module,exports){
+},{"./constants":61,"buffer":"buffer","http":"http","https":"https","rsvp":34,"underscore":35,"url":"url","zlib":"zlib"}],96:[function(require,module,exports){
 var platform = require('../everlive.platform');
 var WebFileStore = require('./WebFileStore');
 var NativeScriptFileStore = require('./NativeScriptFileStore');
@@ -25610,7 +25983,7 @@ if (platform.isNativeScript) {
 } else {
     module.exports = _.noop;
 }
-},{"../common":59,"../everlive.platform":62,"./NativeScriptFileStore":97,"./WebFileStore":98}],96:[function(require,module,exports){
+},{"../common":60,"../everlive.platform":63,"./NativeScriptFileStore":98,"./WebFileStore":99}],97:[function(require,module,exports){
 var platform = require('./../everlive.platform.js');
 var isNativeScript = platform.isNativeScript;
 var isNodejs = platform.isNodejs;
@@ -25689,7 +26062,7 @@ module.exports = (function () {
 
     return LocalStore;
 }());
-},{"./../constants":60,"./../everlive.platform.js":62,"application-settings":"application-settings","local-settings":"local-settings","node-localstorage":"node-localstorage"}],97:[function(require,module,exports){
+},{"./../constants":61,"./../everlive.platform.js":63,"application-settings":"application-settings","local-settings":"local-settings","node-localstorage":"node-localstorage"}],98:[function(require,module,exports){
 'use strict';
 
 var common = require('../common');
@@ -25810,7 +26183,7 @@ NativeScriptFileStore.prototype = {
 };
 
 module.exports = NativeScriptFileStore;
-},{"../common":59,"../utils":102,"file-system":"file-system"}],98:[function(require,module,exports){
+},{"../common":60,"../utils":103,"file-system":"file-system"}],99:[function(require,module,exports){
 'use strict';
 
 var EverliveError = require('../EverliveError').EverliveError;
@@ -26111,7 +26484,7 @@ WebFileStore.prototype = {
 };
 
 module.exports = WebFileStore;
-},{"../EverliveError":48,"../common":59,"../everlive.platform":62,"../utils":102,"path":3}],99:[function(require,module,exports){
+},{"../EverliveError":48,"../common":60,"../everlive.platform":63,"../utils":103,"path":3}],100:[function(require,module,exports){
 var buildPromise = require('../utils').buildPromise;
 var constants = require('../constants');
 var idField = constants.idField;
@@ -26591,6 +26964,10 @@ module.exports = (function () {
         getById: function (id, success, error) {
             var self = this;
 
+            if (!utils.modelHasValidId(id)) {
+                return self._invalidIdErrorResponse(error);
+            }
+
             return buildPromise(function (successCb, errorCb) {
                 var dataQuery = new DataQuery({
                     operation: DataQuery.operations.ReadById,
@@ -26745,16 +27122,26 @@ module.exports = (function () {
          * @param {Function} [success] A success callback.
          * @param {Function} [error] An error callback.
          */
-        rawUpdate: function (attrs, filter, success, error) {
+        rawUpdate: function (attrs, filterOrId, success, error) {
             var self = this;
+            var isSingleUpdate = typeof filterOrId === 'string' || typeof filterOrId === 'number';
+
+            if (isSingleUpdate && !utils.modelHasValidId(filterOrId)) {
+                return self._invalidIdErrorResponse(error);
+            }
+
+            var query = isSingleUpdate ? filterOrId : self._generateQueryFromFilter(filterOrId);
 
             return buildPromise(function (success, error) {
                 var dataQuery = new DataQuery({
                     operation: DataQuery.operations.RawUpdate,
                     collectionName: self.collectionName,
                     parse: Request.parsers.update,
-                    query: filter,
+                    query: query,
                     data: attrs,
+                    additionalOptions: {
+                        id: isSingleUpdate ? filterOrId : undefined
+                    },
                     onSuccess: success,
                     onError: error
                 });
@@ -26806,24 +27193,16 @@ module.exports = (function () {
          * @param {Function} [error] An error callback.
          */
         updateSingle: function (model, success, error) {
-            var err = this._validateIdForModel(model);
-            if (err) {
-                return buildPromise(function (success, error) {
-                    return error(err);
-                }, success, error);
+            if (!utils.modelHasValidId(model)) {
+                return this._invalidIdErrorResponse(error);
             }
+
             return this._update(model, null, true, false, success, error);
         },
 
-        _validateIdForModel: function (model, isDestroy) {
-            // validation for destroySingle('id-as-string') scenario
-            if (((typeof model === 'string' && model !== '') || typeof model === 'number') && isDestroy) {
-                return;
-            }
-
-            if (!model || model.Id === undefined || model.Id === null || model.Id === '') {
-                return new EverliveError(EverliveErrors.invalidId)
-            }
+        _invalidIdErrorResponse: function (errorHandler) {
+            var err = new EverliveError(EverliveErrors.invalidId);
+            return utils.callbackAndPromiseErrorResponse(err, errorHandler);
         },
 
         /**
@@ -26904,11 +27283,8 @@ module.exports = (function () {
          * @param {Function} [error] An error callback.
          */
         destroySingle: function (model, success, error) {
-            var err = this._validateIdForModel(model, true);
-            if (err) {
-                return buildPromise(function (success, error) {
-                    return error(err);
-                }, success, error);
+            if (!utils.modelHasValidId(model)) {
+                return this._invalidIdErrorResponse(error);
             }
 
             return this._destroy(model, null, true, success, error);
@@ -26974,17 +27350,22 @@ module.exports = (function () {
          * @param {Function} [success] A success callback.
          * @param {Function} [error] An error callback.
          */
-        setAcl: function (acl, filter, success, error) {
+        setAcl: function (acl, itemOrId, success, error) {
+            if (!utils.modelHasValidId(itemOrId)) {
+                return this._invalidIdErrorResponse(error);
+            }
+
             var self = this;
+            var id = _.isObject(itemOrId) ? itemOrId[idField] : itemOrId;
 
             return buildPromise(function (success, error) {
                 var dataQuery = new DataQuery({
                     operation: DataQuery.operations.SetAcl,
                     collectionName: self.collectionName,
                     parse: Request.parsers.single,
-                    query: filter,
+                    data: acl,
                     additionalOptions: {
-                        acl: acl
+                        id: id
                     },
                     onSuccess: success,
                     onError: error
@@ -27035,20 +27416,28 @@ module.exports = (function () {
          * @param {Function} [success] A success callback.
          * @param {Function} [error] An error callback.
          */
-        setOwner: function (ownerId, filter, success, error) {
+        setOwner: function (ownerId, itemOrId, success, error) {
+            if (!utils.modelHasValidId(itemOrId)) {
+                return this._invalidIdErrorResponse(error);
+            }
+
             var self = this;
+            var id = _.isObject(itemOrId) ? itemOrId[idField] : itemOrId;
 
             return buildPromise(function (success, error) {
                 var dataQuery = new DataQuery({
                     operation: DataQuery.operations.SetOwner,
                     collectionName: self.collectionName,
-                    query: filter,
                     data: {
                         Owner: ownerId
+                    },
+                    additionalOptions: {
+                        id: id
                     },
                     onSuccess: success,
                     onError: error
                 });
+
                 return self.processDataQuery(dataQuery);
             }, success, error);
         },
@@ -27106,7 +27495,7 @@ module.exports = (function () {
     return Data;
 }());
 
-},{"../Everlive":47,"../EverliveError":48,"../Request":53,"../common":59,"../constants":60,"../everlive.platform":62,"../query/DataQuery":87,"../query/EventQuery":88,"../query/Query":89,"../query/RequestOptionsBuilder":91,"../utils":102}],100:[function(require,module,exports){
+},{"../Everlive":47,"../EverliveError":48,"../Request":53,"../common":60,"../constants":61,"../everlive.platform":63,"../query/DataQuery":88,"../query/EventQuery":89,"../query/Query":90,"../query/RequestOptionsBuilder":92,"../utils":103}],101:[function(require,module,exports){
 /**
  * @class Files
  * @protected
@@ -27321,7 +27710,7 @@ module.exports.addFilesFunctions = function addFilesFunctions(ns) {
         }, success, error);
     }
 };
-},{"../Request":53,"../everlive.platform":62,"../query/DataQuery":87,"../utils":102}],101:[function(require,module,exports){
+},{"../Request":53,"../everlive.platform":63,"../query/DataQuery":88,"../utils":103}],102:[function(require,module,exports){
 /**
  * @class Users
  * @extends Data
@@ -28054,7 +28443,7 @@ module.exports.addUsersFunctions = function addUsersFunctions(ns, everlive) {
         }, success, error);
     };
 };
-},{"../EverliveError":48,"../Request":53,"../common":59,"../query/DataQuery":87,"../utils":102}],102:[function(require,module,exports){
+},{"../EverliveError":48,"../Request":53,"../common":60,"../query/DataQuery":88,"../utils":103}],103:[function(require,module,exports){
 var EverliveError = require('./EverliveError').EverliveError;
 var common = require('./common');
 var _ = common._;
@@ -28243,8 +28632,24 @@ utils.parseUtilities = {
         return utils.parseUtilities._transformResult(data, {ModifiedAt: data.ModifiedAt});
     },
 
-    parseJSON: function (json) {
-        return JSON.parse(json, utils.parseUtilities.getReviver());
+    parseJSON: function (json, reviver) {
+        try {
+            return JSON.parse(json, reviver || utils.parseUtilities.getReviver());
+        } catch (err) {
+            return 'Invalid JSON format. Error: "' + err.message + '". Input: ' + JSON.stringify(json);
+        }
+    },
+
+    parseXhrResponse: function (xhrRequest) {
+        var type = xhrRequest.getResponseHeader(constants.Headers.ContentType);
+        var isJson = type && type.toLowerCase().indexOf('json') > -1;
+        var response = xhrRequest.responseText || xhrRequest.statusText;
+
+        return isJson ? utils.parseUtilities.parseJSON(response) : response;
+    },
+    parseXhrError: function (reviver, xhrRequest) {
+        var message = xhrRequest.responseText || xhrRequest.statusText;
+        return utils.parseUtilities.parseError(reviver, message);
     }
 };
 
@@ -28531,8 +28936,59 @@ utils._inAppBuilderSimulator = function () {
     return typeof window !== undefined && window.navigator && window.navigator.simulator;
 };
 
+utils.isValidId = function (input) {
+    var isValidString = typeof input === 'string' && input !== '';
+    var isValidNumber = typeof input === 'number' && !_.isNaN(input);
+
+    return isValidString || isValidNumber;
+};
+
+utils.modelHasValidId = function (model) {
+    var idToValidate = (typeof model === 'object' && model !== null) ? model.Id : model;
+    return utils.isValidId(idToValidate);
+};
+
+utils.callbackAndPromiseErrorResponse = function (err, errorHandler) {
+    errorHandler = errorHandler || _.noop;
+    errorHandler(err);
+    return utils.rejectedPromise(err);
+};
+
+utils.toQueryString = function (obj) {
+    var queryString = '',
+        encode = encodeURIComponent,
+        append = function (k, v) {
+            queryString += encode(k) + '=' + encode(v) + '&'
+        };
+
+    if (_.isArray(obj)) {
+        for (var i = 0; obj && i < obj.length; i++) {
+            append(obj[i].name, obj[i].value)
+        }
+    } else {
+        for (var propName in obj) {
+            if (!obj.hasOwnProperty(propName)) {
+                continue;
+            }
+
+            var value = obj[propName];
+
+            if (_.isArray(value)) {
+                for (i = 0; i < value.length; i++) {
+                    append(propName, value[i])
+                }
+            } else {
+                append(propName, obj[propName])
+            }
+        }
+    }
+
+    // spaces should be + according to spec
+    return queryString.replace(/&$/, '').replace(/%20/g, '+');
+};
+
 module.exports = utils;
 
-},{"./Everlive":47,"./EverliveError":48,"./common":59,"./constants":60,"./everlive.platform":62,"path":3}]},{},[67])(67)
+},{"./Everlive":47,"./EverliveError":48,"./common":60,"./constants":61,"./everlive.platform":63,"path":3}]},{},[68])(68)
 });
 //# sourceMappingURL=everlive.map
