@@ -5,6 +5,7 @@ publish: true
 page_title: "Deliveries Sample App for PhoneGap/Cordova | Telerik Platform"
 description: A simple hybrid mobile demo app demonstrating how to make use of Offline Support and Caching provided by the Backend Services JavaScript SDK.
 tags: Sample App, Application, Windows Phone, C#, dotnet, .NET, BaaS, mBaaS, Social, Analytics, Social Login
+repo_kind: "Hybrid"
 apis: everlive.constructor everlive.isOnline everlive.online everlive.offline everlive.authentication.persist everlive.helpers.html everlive.on everlive.syncStart everlive.syncEnd everlive.users.currentUser everlive.users.login everlive.users.logout kendo.application kendo.observable kendo.datasource
 related_resources:
 - "[Initializing Offline Support](http://docs.telerik.com/platform/backend-services/javascript/offline-support/offline-initialization)"
